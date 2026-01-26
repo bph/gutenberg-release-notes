@@ -4,16 +4,19 @@ Customize this file to change the behavior of the generator
 """
 
 # Versions to process
-# Format: List of version strings with 'v' prefix
+# Format: Can be either:
+#   - Version string with 'v' prefix (e.g., "v22.0.0") - fetches from GitHub API
+#   - Dictionary with 'file' key (e.g., {"file": "~/path/to/changelog.md", "version": "v22.4.0"})
 VERSIONS = [
     "v22.0.0",
-    "v22.1.0", 
+    "v22.1.0",
     "v22.2.0",
-    "v22.3.0"
+    "v22.3.0",
+    {"file": "~/GBMain/gutenberg/gb224.md", "version": "v22.4.0"}
 ]
 
 # Output file path
-OUTPUT_FILE = "./release_notes_22.0-22.3.md"
+OUTPUT_FILE = "./release_notes_wp7.0.md"
 
 # Developer-only keywords (case-insensitive)
 # Enhancements containing these words will be filtered out

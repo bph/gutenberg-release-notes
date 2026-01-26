@@ -138,44 +138,95 @@ class GutenbergReleaseProcessor:
         
         return True
     
-    def fetch_multiple_releases(self, versions: List[str]) -> List[Dict]:
+    def fetch_multiple_releases(self, versions: List) -> List[Dict]:
         """
         Fetch multiple releases and extract enhancements
-        
+
         Args:
-            versions: List of version strings (e.g., ["v22.0.0", "v22.1.0"])
-            
+            versions: List of version strings or dicts with file paths
+                     e.g., ["v22.0.0", {"file": "path/to/file.md", "version": "v22.4.0"}]
+
         Returns:
             List of dictionaries with version and enhancements
         """
         all_data = []
-        
-        for version in versions:
-            print(f"Fetching {version}...")
-            try:
-                release = self.fetch_release(version)
-                enhancements = self.parse_enhancements(release['body'])
-                
-                # Filter for user-facing enhancements
-                user_enhancements = [
-                    e for e in enhancements 
-                    if self.is_user_facing(e)
-                ]
-                
-                all_data.append({
-                    'version': version,
-                    'name': release.get('name', version),
-                    'published_at': release.get('published_at', ''),
-                    'enhancements': user_enhancements
-                })
-                
-                print(f"  Found {len(user_enhancements)} user-facing enhancements")
-                
-            except Exception as e:
-                print(f"  Error fetching {version}: {e}")
-        
+
+        for version_entry in versions:
+            # Check if it's a local file or API version
+            if isinstance(version_entry, dict) and 'file' in version_entry:
+                # Load from local file
+                version = version_entry['version']
+                file_path = version_entry['file']
+                print(f"Loading {version} from local file: {file_path}...")
+                try:
+                    all_data.append(self._load_from_local_file(file_path, version))
+                    print(f"  Found {len(all_data[-1]['enhancements'])} user-facing enhancements")
+                except Exception as e:
+                    print(f"  Error loading {version} from file: {e}")
+            else:
+                # Fetch from GitHub API
+                version = version_entry
+                print(f"Fetching {version}...")
+                try:
+                    release = self.fetch_release(version)
+                    enhancements = self.parse_enhancements(release['body'])
+
+                    # Filter for user-facing enhancements
+                    user_enhancements = [
+                        e for e in enhancements
+                        if self.is_user_facing(e)
+                    ]
+
+                    all_data.append({
+                        'version': version,
+                        'name': release.get('name', version),
+                        'published_at': release.get('published_at', ''),
+                        'enhancements': user_enhancements
+                    })
+
+                    print(f"  Found {len(user_enhancements)} user-facing enhancements")
+
+                except Exception as e:
+                    print(f"  Error fetching {version}: {e}")
+
         return all_data
-    
+
+    def _load_from_local_file(self, file_path: str, version: str) -> Dict:
+        """
+        Load changelog from a local markdown file
+
+        Args:
+            file_path: Path to the local changelog file
+            version: Version string (e.g., "v22.4.0")
+
+        Returns:
+            Dictionary with version and enhancements
+        """
+        import os
+
+        # Expand user home directory
+        expanded_path = os.path.expanduser(file_path)
+
+        # Read the file
+        with open(expanded_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Parse enhancements from the file
+        enhancements = self.parse_enhancements(content)
+
+        # Filter for user-facing enhancements
+        user_enhancements = [
+            e for e in enhancements
+            if self.is_user_facing(e)
+        ]
+
+        return {
+            'version': version,
+            'name': version,
+            'published_at': '',
+            'enhancements': user_enhancements
+        }
+
     def generate_consolidated_notes(self, releases_data: List[Dict]) -> str:
         """
         Use Claude API to generate consolidated release notes
@@ -250,7 +301,13 @@ def main():
     print("=" * 60)
     print("Gutenberg Release Notes Generator")
     print("=" * 60)
-    print(f"Processing versions: {', '.join(VERSIONS)}\n")
+
+    # Format version list for display
+    version_list = [
+        v if isinstance(v, str) else v['version']
+        for v in VERSIONS
+    ]
+    print(f"Processing versions: {', '.join(version_list)}\n")
     
     # Fetch releases
     releases_data = processor.fetch_multiple_releases(VERSIONS)
