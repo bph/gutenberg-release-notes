@@ -8,15 +8,18 @@ Customize this file to change the behavior of the generator
 #   - Version string with 'v' prefix (e.g., "v22.0.0") - fetches from GitHub API
 #   - Dictionary with 'file' key (e.g., {"file": "~/path/to/changelog.md", "version": "v22.4.0"})
 VERSIONS = [
-    "v22.0.0",
-    "v22.1.0",
-    "v22.2.0",
+    
     "v22.3.0",
-    {"file": "~/GBMain/gutenberg/gb224.md", "version": "v22.4.0"}
-]
+    "v22.4.0",
+    "v22.5.0"
 
+]
+#   {"file": "~/GBMain/gutenberg/gb225.md", "version": "v22.5.0"}
+# "v22.0.0",
+#    "v22.1.0",
+#   "v22.2.0",
 # Output file path
-OUTPUT_FILE = "./release_notes_wp7.0.md"
+OUTPUT_FILE = "./release_notes_wp_126.md"
 
 # Developer-only keywords (case-insensitive)
 # Enhancements containing these words will be filtered out

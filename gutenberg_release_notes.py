@@ -18,7 +18,7 @@ try:
     )
 except ImportError:
     # Default configuration
-    VERSIONS = ["v22.0.0", "v22.1.0", "v22.2.0", "v22.3.0"]
+    VERSIONS = ["v22.0.0", "v22.1.0", "v22.2.0", "v22.3.0", "v22.4.0"]
     OUTPUT_FILE = "./release_notes.md"
     DEVELOPER_KEYWORDS = [
         'api', 'hook', 'filter', 'deprecat', 'refactor',
