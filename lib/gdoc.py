@@ -38,9 +38,11 @@ def _utf16_len(s: str) -> int:
 
 
 def _process_inline(text: str, cursor_utf16: int) -> tuple[str, list[dict]]:
-    """Strip inline markdown (links, bold, italic). Return (plain_text, style_ops).
+    """Strip inline markdown (links, bold, italic) recursively. Returns
+    (plain_text, style_ops).
 
-    style_ops items: {"start", "end", "link"|"bold"|"italic", ...}
+    Recursion matters so that an italic span like `_see [link](url)_` still
+    detects the link inside.
     """
     out_parts: list[str] = []
     ops: list[dict] = []
@@ -61,23 +63,23 @@ def _process_inline(text: str, cursor_utf16: int) -> tuple[str, list[dict]]:
 
         m = MD_BOLD_RE.match(text, i)
         if m:
-            inner = m.group(1)
-            start = pos
-            end = pos + _utf16_len(inner)
-            out_parts.append(inner)
-            ops.append({"start": start, "end": end, "bold": True})
-            pos = end
+            inner_plain, inner_ops = _process_inline(m.group(1), pos)
+            inner_len = _utf16_len(inner_plain)
+            out_parts.append(inner_plain)
+            ops.extend(inner_ops)
+            ops.append({"start": pos, "end": pos + inner_len, "bold": True})
+            pos += inner_len
             i = m.end()
             continue
 
         m = MD_ITALIC_RE.match(text, i)
         if m:
-            inner = m.group(1)
-            start = pos
-            end = pos + _utf16_len(inner)
-            out_parts.append(inner)
-            ops.append({"start": start, "end": end, "italic": True})
-            pos = end
+            inner_plain, inner_ops = _process_inline(m.group(1), pos)
+            inner_len = _utf16_len(inner_plain)
+            out_parts.append(inner_plain)
+            ops.extend(inner_ops)
+            ops.append({"start": pos, "end": pos + inner_len, "italic": True})
+            pos += inner_len
             i = m.end()
             continue
 
