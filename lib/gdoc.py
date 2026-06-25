@@ -26,6 +26,39 @@ SCOPES = ["https://www.googleapis.com/auth/documents"]
 PR_HASH_RE = re.compile(r"#(\d+)")
 PR_URL_RE = re.compile(r"https?://github\.com/[^/]+/[^/]+/pull/(\d+)")
 
+# Markdown inline link: [text](url)
+MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+
+def _utf16_len(s: str) -> int:
+    """Length of `s` in UTF-16 code units — what Google Docs uses for indices."""
+    return len(s.encode("utf-16-le")) // 2
+
+
+def _markdown_links_to_plain(md: str) -> tuple[str, list[tuple[int, int, str]]]:
+    """Strip `[text](url)` → `text`. Returns (plain_text, [(start, end, url), ...])
+    where start/end are UTF-16 offsets within plain_text."""
+    out_parts: list[str] = []
+    links: list[tuple[int, int, str]] = []
+    cursor = 0  # UTF-16 cursor
+    pos = 0
+    for m in MD_LINK_RE.finditer(md):
+        before = md[pos:m.start()]
+        out_parts.append(before)
+        cursor += _utf16_len(before)
+
+        text = m.group(1)
+        url = m.group(2)
+        start = cursor
+        end = cursor + _utf16_len(text)
+        links.append((start, end, url))
+
+        out_parts.append(text)
+        cursor = end
+        pos = m.end()
+    out_parts.append(md[pos:])
+    return "".join(out_parts), links
+
 
 def _config_dir() -> Path:
     return Path(os.path.expanduser(USER_CONFIG_DIR))
@@ -237,7 +270,11 @@ def _read_tab_doc(tab_id: str) -> tuple[dict, dict]:
 
 
 def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str = "") -> None:
-    """Rewrite the entire tab content. Inserts a Notes section + the body."""
+    """Rewrite the entire tab content. Inserts a Notes section + the body.
+
+    Converts `[text](url)` markdown links into real Docs hyperlinks via
+    updateTextStyle requests so PR references are clickable.
+    """
     doc, tab = _read_tab_doc(tab_id)
     body = tab.get("documentTab", {}).get("body", {})
     content = body.get("content", [])
@@ -249,6 +286,18 @@ def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str
         return
     end_index = content[-1].get("endIndex", 1)
     delete_end = max(1, end_index - 1)
+
+    # Build the notes section as-is (plain text, no link conversion).
+    notes_section = (
+        f"{NOTES_HEADER}\n"
+        f"{NOTES_MARKER}\n"
+        f"{preserved_notes}\n\n"
+    )
+    # Strip markdown links from the body, track UTF-16 ranges + URLs.
+    body_plain, body_links = _markdown_links_to_plain(body_markdown)
+    full_text = notes_section + body_plain
+    if not full_text.endswith("\n"):
+        full_text += "\n"
 
     requests: list[dict] = []
     if delete_end > 1:
@@ -262,22 +311,33 @@ def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str
             }
         })
 
-    # Build the full insertion text
-    notes_section = (
-        f"{NOTES_HEADER}\n"
-        f"{NOTES_MARKER}\n"
-        f"{preserved_notes}\n\n"
-    )
-    full_text = notes_section + body_markdown
-    if not full_text.endswith("\n"):
-        full_text += "\n"
-
     requests.append({
         "insertText": {
             "location": {"tabId": tab_id, "index": 1},
             "text": full_text,
         }
     })
+
+    # Apply hyperlink styling to each link range.
+    notes_offset = _utf16_len(notes_section)
+    for start, end, url in body_links:
+        requests.append({
+            "updateTextStyle": {
+                "range": {
+                    "tabId": tab_id,
+                    "startIndex": 1 + notes_offset + start,
+                    "endIndex": 1 + notes_offset + end,
+                },
+                "textStyle": {
+                    "link": {"url": url},
+                    "foregroundColor": {
+                        "color": {"rgbColor": {"red": 0.067, "green": 0.333, "blue": 0.8}}
+                    },
+                    "underline": True,
+                },
+                "fields": "link,foregroundColor,underline",
+            }
+        })
 
     _service().documents().batchUpdate(
         documentId=SOT_DOC_ID, body={"requests": requests}
