@@ -37,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Skip Google Doc read/write; only update local mirror")
     parser.add_argument("--force-refresh", action="store_true",
                         help="Re-fetch every release from GitHub (ignore version cache)")
+    parser.add_argument("--refresh-clusters", action="store_true",
+                        help="Delete the cluster cache to force a fresh clustering pass")
     args = parser.parse_args(argv)
 
     print(f"Punch-list run for WP {WP_CYCLE}")
@@ -116,6 +118,9 @@ def main(argv: list[str] | None = None) -> int:
           f"{len(match_result.leftover_prs)} leftover ({time.time() - t:.1f}s)")
 
     # ---- 5. Cluster leftovers ----
+    if args.refresh_clusters and cluster.CLUSTERS_PATH.exists():
+        cluster.CLUSTERS_PATH.unlink()
+        print("\n  (cluster cache cleared by --refresh-clusters)")
     print(f"\n[5/7] Clustering {len(match_result.leftover_prs)} leftover PRs (Claude, ~30-90s)…", flush=True)
     t = time.time()
     clusters = cluster.cluster_leftovers(match_result.leftover_prs)

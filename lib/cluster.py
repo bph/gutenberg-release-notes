@@ -102,9 +102,16 @@ def cluster_leftovers(leftover_prs: list[dict]) -> list[Cluster]:
         else []
     )
 
-    prompt = f"""Group these shipped Gutenberg PRs into 5–15 feature clusters
+    prompt = f"""Group these shipped Gutenberg PRs into specific feature clusters
 for a WordPress release-cycle changelog aimed at WordPress users and content
 editors (not core developers).
+
+Target: 15–25 clusters total. Each cluster should ideally hold 4–15 PRs.
+Both extremes are bad:
+- Avoid grab-bag mega-clusters of 25+ PRs covering unrelated areas — split by sub-area.
+- Avoid one-off singleton clusters with a single PR — fold them into the closest
+  cluster of related work. If you would create a cluster of 1-2 PRs, look for a
+  larger sibling cluster they could join.
 
 PRIOR run's clusters (use as anchors — keep titles stable, place new PRs into
 existing clusters when they fit; create new clusters only when a PR doesn't fit;
