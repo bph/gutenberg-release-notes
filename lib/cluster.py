@@ -118,6 +118,11 @@ Rules:
 - Every PR number above MUST appear in exactly one cluster's `pr_numbers` array.
 - Reuse prior cluster titles verbatim when applicable.
 - Cluster `title`: 3-7 words, recognizable to users.
+- Cluster TITLES must be specific, descriptive feature areas. DO NOT use generic
+  catch-alls like "Miscellaneous", "Other", "Unclustered", "Misc Improvements",
+  "Various Changes" etc. If a few PRs don't fit anywhere, put them in the
+  closest reasonable cluster or create a small, specifically-named cluster
+  (e.g. "Storybook configuration", not "Misc tooling").
 - Cluster `summary`: a 2-4 sentence paragraph that:
     1. Explains WHAT the cluster of PRs adds or improves, in plain language users
        would recognize. Avoid developer jargon — say "list view" not "List View
@@ -154,32 +159,50 @@ Return ONLY a JSON array, nothing else:
         raise
 
     clusters: list[Cluster] = []
+    by_title: dict[str, Cluster] = {}
     seen: set[int] = set()
     for c in data:
-        prs: list[ClusterPR] = []
+        title = c["title"].strip()
+        summary = c.get("summary", "")
+        cluster = by_title.get(title)
+        if cluster is None:
+            cluster = Cluster(title=title, summary=summary, prs=[])
+            by_title[title] = cluster
+            clusters.append(cluster)
+        elif summary and not cluster.summary:
+            cluster.summary = summary
         for n in c.get("pr_numbers", []):
             pr = by_number.get(int(n))
             if not pr or int(n) in seen:
                 continue
             seen.add(int(n))
-            prs.append(ClusterPR(
+            cluster.prs.append(ClusterPR(
                 number=pr["number"], title=pr["title"],
                 url=pr["url"], version=pr["version"],
             ))
-        if prs:
-            clusters.append(Cluster(title=c["title"], summary=c.get("summary", ""), prs=prs))
 
-    # Catch any PRs the LLM forgot to place
+    # Catch any PRs the LLM forgot to place — fold into the catch-all bucket
+    # if one already exists, otherwise create it.
     missing = [pr for n, pr in by_number.items() if n not in seen]
     if missing:
-        clusters.append(Cluster(
-            title="Unclustered",
-            summary="PRs the clusterer didn't assign to a feature group.",
-            prs=[ClusterPR(
+        catchall_title = "Other shipped improvements"
+        cluster = by_title.get(catchall_title)
+        if cluster is None:
+            cluster = Cluster(
+                title=catchall_title,
+                summary="PRs that didn't fit any of the named feature clusters.",
+                prs=[],
+            )
+            by_title[catchall_title] = cluster
+            clusters.append(cluster)
+        for pr in missing:
+            cluster.prs.append(ClusterPR(
                 number=pr["number"], title=pr["title"],
                 url=pr["url"], version=pr["version"],
-            ) for pr in missing],
-        ))
+            ))
+
+    # Drop empty clusters that may have been carried over from prior cache
+    clusters = [c for c in clusters if c.prs]
 
     _save(clusters)
     return clusters
