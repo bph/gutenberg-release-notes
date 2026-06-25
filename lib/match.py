@@ -33,6 +33,13 @@ class MatchedPR:
 
 
 @dataclass
+class SubGroup:
+    title: str
+    summary: str
+    pr_numbers: list[int] = field(default_factory=list)
+
+
+@dataclass
 class MatchedRoadmapItem:
     title: str
     summary: str
@@ -40,6 +47,10 @@ class MatchedRoadmapItem:
     tracking_title: str = ""
     tracking_url: str = ""
     matched_prs: list[MatchedPR] = field(default_factory=list)
+    sub_groups: list[SubGroup] = field(default_factory=list)
+
+
+LARGE_ITEM_THRESHOLD = 15  # split into sub-areas when matched_prs exceeds this
 
 
 @dataclass
@@ -134,8 +145,81 @@ def match(
             if conf in ("high", "medium"):
                 assigned.add(n)
 
+    # Subdivide large roadmap items into sub-areas
+    for item in items:
+        if len(item.matched_prs) > LARGE_ITEM_THRESHOLD:
+            try:
+                item.sub_groups = _split_into_sub_areas(item)
+                print(f"    split '{item.title}' ({len(item.matched_prs)} PRs) into {len(item.sub_groups)} sub-areas")
+            except Exception as e:
+                print(f"    ⚠️  could not split '{item.title}': {e}")
+
     leftover_prs = [pr for n, pr in all_prs.items() if n not in assigned]
     return MatchResult(items=items, leftover_prs=leftover_prs)
+
+
+def _split_into_sub_areas(item: MatchedRoadmapItem) -> list[SubGroup]:
+    """Ask Claude to split a large roadmap item's PRs into 3-6 sub-area groups."""
+    load_dotenv()
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+    pr_brief = [
+        f"#{p.number} ({p.version}): {p.title}" for p in item.matched_prs
+    ]
+
+    prompt = f"""You're organizing the PRs landed under one WordPress roadmap item
+into 3–6 thematic sub-areas, written for WordPress users and content editors.
+
+Roadmap item: "{item.title}"
+Summary: {item.summary}
+
+The {len(item.matched_prs)} PRs to split:
+{chr(10).join(pr_brief)}
+
+Rules:
+- Every PR number above MUST appear in exactly one sub-area's pr_numbers.
+- Sub-area titles: 3-6 words, specific and concrete (e.g. "Tooltip component
+  redesign", "Popover and overlay primitives") — NOT generic ("Misc", "Other").
+- Sub-area summaries: 1-2 sentences. What's in this sub-area and why it matters.
+- Aim for sub-areas of 4-15 PRs each. Avoid singletons; fold them into a sibling.
+
+IMPORTANT: In summary text, use single quotes 'like this' for quoted phrases.
+Do NOT use double-quote characters " inside string values — they break the JSON.
+
+Return ONLY a JSON array:
+[
+  {{"title": "Sub-area name", "summary": "One or two sentences.", "pr_numbers": [12345, 12346]}}
+]"""
+
+    resp = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=CLAUDE_MAX_TOKENS,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = resp.content[0].text.strip()
+    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL)
+    data = json.loads(raw)
+
+    assigned_to_sub: set[int] = set()
+    sub_groups: list[SubGroup] = []
+    valid_numbers = {p.number for p in item.matched_prs}
+    for sg in data:
+        pr_numbers = [int(n) for n in sg.get("pr_numbers", []) if int(n) in valid_numbers]
+        pr_numbers = [n for n in pr_numbers if n not in assigned_to_sub]
+        assigned_to_sub.update(pr_numbers)
+        if pr_numbers:
+            sub_groups.append(SubGroup(
+                title=sg["title"],
+                summary=sg.get("summary", ""),
+                pr_numbers=pr_numbers,
+            ))
+
+    # Sweep any PRs the LLM forgot into a sibling sub-area
+    missed = [p.number for p in item.matched_prs if p.number not in assigned_to_sub]
+    if missed and sub_groups:
+        sub_groups[-1].pr_numbers.extend(missed)
+
+    return sub_groups
 
 
 def _fuzzy_match_with_claude(

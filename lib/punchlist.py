@@ -108,9 +108,22 @@ def render_markdown(
                 url = item.tracking_url or f"https://github.com/WordPress/gutenberg/issues/{item.tracking_issue}"
                 lines.append(f"Tracking: [{label}]({url}) (#{item.tracking_issue})")
             lines.append("")
-            for pr in item.matched_prs:
-                lines.append(_pr_line(pr, covered, new_prs))
-            lines.append("")
+            if item.sub_groups:
+                pr_by_number = {p.number: p for p in item.matched_prs}
+                for sg in item.sub_groups:
+                    lines.append(f"#### {sg.title}")
+                    if sg.summary:
+                        lines.append(sg.summary)
+                    lines.append("")
+                    for n in sg.pr_numbers:
+                        pr = pr_by_number.get(n)
+                        if pr is not None:
+                            lines.append(_pr_line(pr, covered, new_prs))
+                    lines.append("")
+            else:
+                for pr in item.matched_prs:
+                    lines.append(_pr_line(pr, covered, new_prs))
+                lines.append("")
 
     # ---- Additional features (clusters from leftovers) ----
     lines.append("## Additional shipped features")

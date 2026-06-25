@@ -131,6 +131,9 @@ def markdown_to_docs_ops(md: str) -> tuple[str, list[dict]]:
         elif line.startswith("### "):
             style = "HEADING_3"
             body = line[4:]
+        elif line.startswith("#### "):
+            style = "HEADING_4"
+            body = line[5:]
         elif line.startswith("- ") or line.startswith("* "):
             is_bullet = True
             body = line[2:]

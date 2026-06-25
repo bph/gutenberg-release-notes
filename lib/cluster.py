@@ -139,6 +139,9 @@ Rules:
   If the PRs share a clear theme, name it. If they're a grab-bag of polish in one
   area, say that honestly.
 
+IMPORTANT: In any summary text, use single quotes 'like this' for quoted phrases.
+Do NOT use double-quote characters " inside string values — they break the JSON.
+
 Return ONLY a JSON array, nothing else:
 [
   {{
