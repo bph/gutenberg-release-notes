@@ -37,6 +37,8 @@ class MatchedRoadmapItem:
     title: str
     summary: str
     tracking_issue: int | None
+    tracking_title: str = ""
+    tracking_url: str = ""
     matched_prs: list[MatchedPR] = field(default_factory=list)
 
 
@@ -81,6 +83,8 @@ def match(
         )
         if ri.tracking_issue:
             tr = tracking.resolve(ri.tracking_issue, use_cache=False)
+            m.tracking_title = tr.title
+            m.tracking_url = tr.url
             tracked = set(tr.pr_numbers)
             for n in tracked:
                 if n in all_prs and n not in assigned:

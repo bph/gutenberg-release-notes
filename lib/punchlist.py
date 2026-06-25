@@ -100,10 +100,13 @@ def render_markdown(
         )
         for item in ordered:
             status = _item_status(item, covered)
-            tracking = f" — tracking #{item.tracking_issue}" if item.tracking_issue else ""
-            lines.append(f"### {status} {item.title}{tracking}")
+            lines.append(f"### {status} {item.title}")
             if item.summary:
                 lines.append(item.summary)
+            if item.tracking_issue:
+                label = item.tracking_title or f"Tracking issue #{item.tracking_issue}"
+                url = item.tracking_url or f"https://github.com/WordPress/gutenberg/issues/{item.tracking_issue}"
+                lines.append(f"Tracking: [{label}]({url}) (#{item.tracking_issue})")
             lines.append("")
             for pr in item.matched_prs:
                 lines.append(_pr_line(pr, covered, new_prs))

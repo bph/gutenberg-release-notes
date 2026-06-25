@@ -28,6 +28,8 @@ PR_URL_RE = re.compile(r"https?://github\.com/[^/]+/[^/]+/pull/(\d+)")
 class TrackingResolution:
     issue_number: int
     pr_numbers: list[int]
+    title: str = ""
+    url: str = ""
 
 
 def _sub_issues(issue_n: int) -> set[int]:
@@ -77,24 +79,44 @@ def _timeline_cross_refs(issue_n: int) -> set[int]:
     return out
 
 
-def _body_task_refs(issue_n: int) -> set[int]:
+def _fetch_issue(issue_n: int) -> dict:
+    """Fetch the issue itself (for title + body)."""
     try:
-        data = github_api.get(f"/repos/{GITHUB_REPO}/issues/{issue_n}")
+        return github_api.get(f"/repos/{GITHUB_REPO}/issues/{issue_n}")
     except Exception:
-        return set()
-    body = data.get("body") or ""
-    return {int(m.group(1)) for m in TASK_LIST_REF_RE.finditer(body)}
+        return {}
+
+
+def _body_task_refs_from(issue_body: str) -> set[int]:
+    return {int(m.group(1)) for m in TASK_LIST_REF_RE.finditer(issue_body or "")}
 
 
 def resolve(issue_n: int, *, use_cache: bool = True) -> TrackingResolution:
-    """Resolve and cache the PR set for a tracking issue."""
+    """Resolve and cache the PR set + metadata for a tracking issue."""
     TRACKING_DIR.mkdir(parents=True, exist_ok=True)
     cache = TRACKING_DIR / f"{issue_n}.json"
     if use_cache and cache.exists():
         data = json.loads(cache.read_text())
-        return TrackingResolution(issue_number=issue_n, pr_numbers=data["pr_numbers"])
+        return TrackingResolution(
+            issue_number=issue_n,
+            pr_numbers=data["pr_numbers"],
+            title=data.get("title", ""),
+            url=data.get("url", ""),
+        )
 
-    prs = _sub_issues(issue_n) | _timeline_cross_refs(issue_n) | _body_task_refs(issue_n)
+    issue = _fetch_issue(issue_n)
+    title = issue.get("title", "")
+    url = issue.get("html_url", f"https://github.com/{GITHUB_REPO}/issues/{issue_n}")
+    body = issue.get("body", "")
+
+    prs = _sub_issues(issue_n) | _timeline_cross_refs(issue_n) | _body_task_refs_from(body)
     pr_numbers = sorted(prs)
-    cache.write_text(json.dumps({"issue_number": issue_n, "pr_numbers": pr_numbers}, indent=2))
-    return TrackingResolution(issue_number=issue_n, pr_numbers=pr_numbers)
+    cache.write_text(json.dumps({
+        "issue_number": issue_n,
+        "pr_numbers": pr_numbers,
+        "title": title,
+        "url": url,
+    }, indent=2))
+    return TrackingResolution(
+        issue_number=issue_n, pr_numbers=pr_numbers, title=title, url=url
+    )
