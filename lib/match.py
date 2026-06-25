@@ -101,18 +101,23 @@ def match(
                     assigned.add(n)
         items.append(m)
 
-    # Tier 2: Claude fuzzy matching for items without tracking issues
-    items_without_tracking = [m for m in items if not m.tracking_issue]
+    # Tier 2: Claude fuzzy matching against ALL roadmap items (not just those
+    # without a tracking issue). This lets a roadmap item with a tracking issue
+    # also absorb related PRs that the tracking issue didn't explicitly list —
+    # avoiding the "DataViews roadmap item is empty while a DataViews cluster
+    # sits in Additional features" duplication.
     unassigned = [pr for n, pr in all_prs.items() if n not in assigned]
 
-    if items_without_tracking and unassigned:
-        fuzzy = _fuzzy_match_with_claude(items_without_tracking, unassigned)
+    if items and unassigned:
+        fuzzy = _fuzzy_match_with_claude(items, unassigned)
         for assignment in fuzzy:
             n = assignment["pr_number"]
             title = assignment["roadmap_title"]
             conf = assignment.get("confidence", "low")
             target = next((m for m in items if m.title == title), None)
             if not target or n not in all_prs:
+                continue
+            if n in assigned:
                 continue
             pr = all_prs[n]
             target.matched_prs.append(
@@ -140,20 +145,31 @@ def _fuzzy_match_with_claude(
     load_dotenv()
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-    roadmap_brief = [{"title": it.title, "summary": it.summary} for it in items]
+    roadmap_brief = [
+        {
+            "title": it.title,
+            "summary": it.summary,
+            "already_assigned_pr_count": len(it.matched_prs),
+        }
+        for it in items
+    ]
     pr_brief = [{"number": pr["number"], "title": pr["title"]} for pr in unassigned]
 
     prompt = f"""Match shipped Gutenberg PRs to WordPress roadmap items.
 
-Roadmap items (with no GitHub tracking issue):
+Roadmap items (some already have PRs from their tracking issues — you can add
+MORE PRs to any of them if a leftover clearly belongs to that area):
 {json.dumps(roadmap_brief, indent=2)}
 
-Shipped PRs:
+Leftover PRs (not yet assigned to any roadmap item):
 {json.dumps(pr_brief, indent=2)}
 
 For each PR that clearly belongs to one of the roadmap items, return an assignment.
-PRs that don't clearly fit ANY roadmap item should be omitted (they will appear
-under "Additional shipped features" instead).
+A roadmap item like "DataViews and DataForms improvements" SHOULD absorb related
+DataViews/DataForms PRs even if the tracking issue didn't explicitly list them.
+
+PRs that don't fit ANY roadmap item should be omitted — they will appear
+under "Additional shipped features" instead.
 
 Confidence:
 - "high": PR title/topic unambiguously matches the roadmap item
