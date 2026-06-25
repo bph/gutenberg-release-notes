@@ -351,21 +351,27 @@ def read_pr_set(*, tab_id: str | None = None, title: str | None = None) -> set[i
 
 
 NOTES_HEADER = "📝 Notes"
-NOTES_MARKER = "<!-- your notes below survive rewrites -->"
+NOTES_OPEN_MARKER = "<!-- your notes below survive rewrites -->"
+NOTES_CLOSE_MARKER = "<!-- end notes — script-generated content below -->"
 
 
 def extract_notes_block(tab_text: str) -> str:
     """Return the user-notes block from a previous Backlog render, or empty.
 
-    The block is the text between the NOTES_MARKER line and the first '# '
-    H1 heading (start of the generated body).
+    The block is the text strictly between NOTES_OPEN_MARKER and
+    NOTES_CLOSE_MARKER. If the close marker is missing (e.g. tab written by
+    an old version that used markdown headings to delimit), we conservatively
+    return an empty notes block rather than risk re-inserting prior body
+    content as 'notes'.
     """
-    if NOTES_MARKER not in tab_text:
+    if NOTES_OPEN_MARKER not in tab_text:
         return ""
-    after_marker = tab_text.split(NOTES_MARKER, 1)[1]
-    # Stop at first '# ' at the start of a line (H1)
-    m = re.search(r"\n# ", after_marker)
-    notes = after_marker[: m.start()] if m else after_marker
+    after_open = tab_text.split(NOTES_OPEN_MARKER, 1)[1]
+    if NOTES_CLOSE_MARKER not in after_open:
+        # No close marker → either fresh tab or written by older code; safest
+        # to start fresh instead of inheriting the rest of the doc.
+        return ""
+    notes = after_open.split(NOTES_CLOSE_MARKER, 1)[0]
     return notes.strip("\n")
 
 
@@ -482,8 +488,9 @@ def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str
 
     notes_section = (
         f"{NOTES_HEADER}\n"
-        f"{NOTES_MARKER}\n"
-        f"{preserved_notes}\n\n"
+        f"{NOTES_OPEN_MARKER}\n"
+        f"{preserved_notes}\n"
+        f"{NOTES_CLOSE_MARKER}\n\n"
     )
 
     notes_offset = _utf16_len(notes_section)

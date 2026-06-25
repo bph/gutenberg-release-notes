@@ -105,11 +105,8 @@ def render_markdown(
             if item.summary:
                 lines.append(f"_{item.summary}_")
             lines.append("")
-            if not item.matched_prs:
-                lines.append("_No matching PRs yet._")
-            else:
-                for pr in item.matched_prs:
-                    lines.append(_pr_line(pr, covered, new_prs))
+            for pr in item.matched_prs:
+                lines.append(_pr_line(pr, covered, new_prs))
             lines.append("")
 
     # ---- Additional features (clusters from leftovers) ----
