@@ -11,5 +11,6 @@ data/versions/
 data/tracking/
 data/state_wp-*.json
 data/clusters_wp-*.json
+data/clusters_wp-*.raw.txt
 data/last_punchlist_wp-*.json
 punchlist/
