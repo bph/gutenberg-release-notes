@@ -1,1 +1,15 @@
 .env
+__pycache__/
+*.pyc
+venv/
+.venv/
+# OAuth tokens are kept in ~/.config/gutenberg-release-notes/ — guard against accidental copy-in
+credentials.json
+token.json
+# Generated caches and outputs — re-derived from API + roadmap on each run
+data/versions/
+data/tracking/
+data/state_wp-*.json
+data/clusters_wp-*.json
+data/last_punchlist_wp-*.json
+punchlist/

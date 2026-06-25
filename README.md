@@ -1,149 +1,154 @@
-# Gutenberg Release Notes Generator
+# Gutenberg Release Notes Punch-List
 
-Automatically generate user-friendly release notes from multiple Gutenberg plugin releases by extracting and consolidating Enhancement sections using AI.
+A small tool that watches each new Gutenberg plugin release, cross-references the shipped PRs against the WordPress release cycle's roadmap and the in-progress Source of Truth (SOT) Google Doc, and writes a feature-clustered punch-list back to a dedicated tab in the doc. Designed for a smooth, ongoing process of writing the SOT instead of a manual batch job.
 
-## Overview
+## What it does, in one diagram
 
-This tool:
-1. **Fetches** release data from GitHub for specified Gutenberg versions
-2. **Extracts** Enhancement sections from each release
-3. **Filters** out developer-only features to focus on user-facing changes
-4. **Consolidates** changes across multiple versions
-5. **Generates** narrative release notes using Claude API
-
-## Features
-
-- ✅ Automatic filtering of developer-focused enhancements
-- ✅ Smart grouping of related features across versions
-- ✅ Natural language narrative output (not bullet points)
-- ✅ Customizable version ranges
-- ✅ Intermediate file outputs for review
-
-## Installation
-
-### Requirements
-
-- Python 3.7+
-- `requests` library
-
-### Setup
-
-```bash
-# Install dependencies
-pip install requests
-
-# Clone or download this repository
-# No additional setup required!
+```
+┌────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│ Roadmap post       │  │ Gutenberg releases  │  │ Google Doc          │
+│ (make.wp.org)      │  │ (GitHub API)        │  │ "Draft wip" tab     │
+└────────┬───────────┘  └──────────┬──────────┘  └──────────┬──────────┘
+         │                         │                         │
+         ▼                         ▼                         ▼
+   roadmap items          shipped PRs (filtered)       cited PR numbers
+   + tracking issues      by cycle phase & backport     (= ✅ covered)
+         │                         │                         │
+         └────────┬────────────────┴────────────┬────────────┘
+                  ▼                             ▼
+            roadmap matcher              coverage check
+       (tracking-issue → PRs,         (Draft wip ∪ Handled)
+        Claude fuzzy fallback)
+                  │
+                  ▼
+         Backlog tab in same doc:
+         feature-clustered punch-list with ✅ / 🔲 / ⏳ markers
 ```
 
-## Usage
+## Status semantics
 
-### Basic Usage
+Per-roadmap-item:
+
+| Marker | Meaning |
+|---|---|
+| ⏳ | No matching PRs shipped yet |
+| 🚧 | PRs shipped, none cited in Draft wip |
+| 🟡 | Some PRs cited, some still 🔲 |
+| ✅ | All matched PRs cited |
+
+Per-PR:
+
+| Marker | Meaning |
+|---|---|
+| ✅ | PR number appears in Draft wip OR Handled tab |
+| 🔲 | PR not yet cited |
+| 🆕 | New since the previous run (one cycle only) |
+| ⚠️ | Low-confidence fuzzy match — eyeball this one |
+
+## Tabs in the SOT Google Doc
+
+- **Draft wip** — your prose. Read-only to the script. Cite every PR you write up (`[#NNNNN](...)`) — preferably as a trailing link list per feature section.
+- **Handled** — user-edited list of PR numbers you've dealt with by means *other than* a direct citation. Use it for: features covered in prose without explicit cites, intentional skips, or genuine false positives. One-line notes alongside each number are encouraged.
+- **Backlog** — script-managed. Rewritten each run, except for the `📝 Notes` block at the top guarded by `<!-- your notes below survive rewrites -->`.
+
+## One-time setup
+
+### 1. Python environment
 
 ```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Google Cloud OAuth (for Docs API)
+
+1. Visit https://console.cloud.google.com → create project `gutenberg-release-notes` (or reuse one)
+2. **APIs & Services → Library** → enable **Google Docs API**
+3. **APIs & Services → OAuth consent screen** → External → add your email as a test user
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID → Desktop app** → download `credentials.json`
+5. Place the file at `~/.config/gutenberg-release-notes/credentials.json`
+6. First script run will open a browser for consent; the resulting `token.json` is cached alongside `credentials.json` and refreshed automatically.
+
+### 3. Anthropic API key
+
+Set `ANTHROPIC_API_KEY` in `.env` (the repo already has a `.env.example`).
+
+### 4. GitHub auth
+
+The script uses your existing `gh` CLI auth (`gh auth login`). No extra setup if `gh auth status` is green.
+
+## Running
+
+```bash
+# Normal run after a new GB plugin release
 python gutenberg_release_notes.py
+
+# Force re-fetch and re-parse the roadmap post
+python gutenberg_release_notes.py --refresh-roadmap
+
+# Local-only: skip Google Doc read/write (useful for testing or no-auth runs)
+python gutenberg_release_notes.py --skip-gdoc
+
+# Re-fetch all releases from GitHub (ignore per-version cache)
+python gutenberg_release_notes.py --force-refresh
 ```
 
-### Configuration
+A typical run takes ~30 seconds for an active cycle.
 
-Edit the script to customize:
+## Cycle configuration
+
+In `config.py`:
 
 ```python
-# Specify which versions to process
-VERSIONS = ["v22.0.0", "v22.1.0", "v22.2.0", "v22.3.0"]
+WP_CYCLE = "7.1"
+WP_CYCLE_START_VERSION = "v22.7.0"      # first GB version in this cycle
+WP_CYCLE_BETA_1_VERSION = None           # set when WP Beta 1 is announced
+WP_CYCLE_END_VERSION = None              # set when WP GA ships
 
-# Optional: Set your Anthropic API key
-ANTHROPIC_API_KEY = "your-api-key-here"
+SOT_DOC_ID = "12Kns...."                 # Google Doc ID
+SOT_DRAFT_TAB_ID = "t.ap1297to0djs"      # the "Draft wip" tab
+ROADMAP_URL = "https://make.wordpress.org/core/2026/06/19/roadmap-to-7-1/"
 ```
 
-### With API Key
+Backport filtering is **phase-aware** based on `WP_CYCLE_BETA_1_VERSION`:
 
-If you provide an Anthropic API key, the tool will automatically generate the final release notes:
+| Phase | Non-backport PR | Backport-labeled PR |
+|---|---|---|
+| Pre-Beta-1 (default) | ✅ include | ❌ exclude (→ previous WP) |
+| Post-Beta-1 | ❌ exclude (→ next WP) | ✅ include (→ this cycle) |
 
-```bash
-# Set environment variable
-export ANTHROPIC_API_KEY="your-key"
-python gutenberg_release_notes.py
+Schedule: run manually after each Gutenberg plugin release (every ~2 weeks). RCs are skipped automatically.
 
-# Or edit the script directly
-# ANTHROPIC_API_KEY = "your-key"
+## Repo layout
+
 ```
-
-### Without API Key
-
-If no API key is provided, the tool will:
-1. Extract and filter enhancements
-2. Save a formatted prompt to `claude_prompt.txt`
-3. You can then manually paste this into claude.ai
-
-## Output Files
-
-The tool generates several files:
-
-| File | Description |
-|------|-------------|
-| `enhancements_filtered.txt` | All user-facing enhancements organized by version and section |
-| `claude_prompt.txt` | Ready-to-use prompt for Claude API |
-| `release_notes_X_Y.md` | Final consolidated release notes (if API key provided) |
-
-## How It Works
-
-### 1. Fetching Releases
-
-The tool fetches release pages from GitHub:
+gutenberg-release-notes/
+├── config.py
+├── gutenberg_release_notes.py    # entrypoint
+├── lib/
+│   ├── parse.py                  # release body → enhancement bullets
+│   ├── github_api.py             # auth + REST helper
+│   ├── github_releases.py        # discovery, PR labels, backport filter
+│   ├── tracking.py               # roadmap tracking-issue → PR set
+│   ├── roadmap.py                # fetch + Claude-parse roadmap post
+│   ├── gdoc.py                   # Google Docs OAuth + tab read/write
+│   ├── match.py                  # roadmap-PR matching (deterministic + fuzzy)
+│   ├── cluster.py                # cluster leftover PRs (Claude, anchored)
+│   ├── punchlist.py              # render markdown punch-list
+│   └── state.py                  # JSON state on disk
+├── data/                         # version caches, tracking caches, state, clusters
+├── punchlist/                    # local markdown mirror of each run
+└── archive/                      # prior cycles' outputs (read-only history)
 ```
-https://github.com/WordPress/gutenberg/releases/tag/v22.3.0
-```
-
-### 2. Parsing Enhancements
-
-Extracts the `### Enhancements` section and identifies:
-- Subsection headers (e.g., `#### Block Editor`)
-- Individual enhancement items (lines starting with `*`)
-
-### 3. Filtering
-
-Removes developer-only enhancements based on:
-
-**Developer-only sections:**
-- Data Layer
-- Code Quality  
-- Build Tooling
-- Testing
-- Documentation
-- Tools & Packages
-
-**Developer-only keywords:**
-- API, hooks, refactor
-- TypeScript migrations
-- Test improvements
-- Type annotations
-
-**User-facing indicators:**
-- UI, editor, toolbar
-- Panel, modal, button
-- Menu, dialog
-
-### 4. Consolidation
-
-Groups related features across versions to show evolution.
-
-### 5. Generation
-
-Uses Claude to transform technical bullet points into clear narrative prose.
 
 ## Troubleshooting
 
-### No enhancements found
-- Verify the version tags exist on GitHub
-- Check if the release format changed
-- The regex pattern may need updating
-
-### API errors
-- Verify your API key is valid
-- Check you have API credits
-- Ensure internet connectivity
+- **`gh: command not found`** — install GitHub CLI (`brew install gh`), then `gh auth login`.
+- **Browser doesn't open for Google consent** — first run needs interactive consent; subsequent runs use the cached refresh token in `~/.config/gutenberg-release-notes/token.json`.
+- **Backport label changes name on `WordPress/gutenberg`** — update `BACKPORT_LABEL` in `config.py`.
+- **Roadmap items with low-confidence parse** — hand-edit `data/roadmap_wp-<cycle>.json` and re-run; the cached file is the source of truth for the matcher.
 
 ## License
 
-MIT License - feel free to use and modify for your needs.
+MIT.

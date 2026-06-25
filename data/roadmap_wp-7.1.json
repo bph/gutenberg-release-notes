@@ -1,0 +1,266 @@
+[
+  {
+    "title": "AI Client generation streaming",
+    "summary": "Generation streaming introduced in the PHP AI Client as an initial effort to unlock full usage in a future release.",
+    "tracking_issue": null,
+    "confidence": "medium"
+  },
+  {
+    "title": "AI Client embeddings support",
+    "summary": "Embeddings represent content as vectors to enable meaning-based search across a site.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Connectors authentication expansion",
+    "summary": "Connectors gain more ways to authenticate beyond API keys, starting with username/application password support.",
+    "tracking_issue": 78647,
+    "confidence": "high"
+  },
+  {
+    "title": "Guidelines feature",
+    "summary": "A new Guidelines feature lets you define writing and content guidelines that tie into AI tooling, with the ability to import/export guidelines between sites.",
+    "tracking_issue": 75171,
+    "confidence": "high"
+  },
+  {
+    "title": "Command palette organization improvements",
+    "summary": "The command palette now groups results into clear sections for recent, suggested, and matching commands.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Admin color scheme in Site Editor",
+    "summary": "The Site Editor sidebar and overall shell now follow the set WordPress admin color scheme instead of always using a fixed dark background.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "DataViews and DataForms iterations",
+    "summary": "Work is underway to migrate DataViews onto the new Design System primitives and consolidate Quick Edit with the editor inspector.",
+    "tracking_issue": 76045,
+    "confidence": "high"
+  },
+  {
+    "title": "Dedicated Identity section",
+    "summary": "A dedicated Design \u2192 Identity screen brings the essentials of your site's identity into one place, with an inline media editor for your logo and favicon.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Design System ThemeProvider graduation",
+    "summary": "A highlight of this cycle is graduating ThemeProvider from experimental to a stable, public API, alongside finalizing the public token names.",
+    "tracking_issue": 76941,
+    "confidence": "high"
+  },
+  {
+    "title": "On This Day dashboard widget",
+    "summary": "The dashboard is getting a new \"On This Day\" widget that resurfaces past content, a popular feature across many different platforms.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Persistent admin bar (omnibar)",
+    "summary": "The admin bar is getting some nice polish ahead of being easily accessible in the Site Editor and Block Editor.",
+    "tracking_issue": 79036,
+    "confidence": "high"
+  },
+  {
+    "title": "Revisions improvements",
+    "summary": "Planned improvements include a spark line view in the scrubbing toolbar to better visualize the history of changes, persistent URLs to allow sharing a link to a particular revision, and more.",
+    "tracking_issue": 79120,
+    "confidence": "high"
+  },
+  {
+    "title": "Abilities API iteration",
+    "summary": "This cycle advances querying and filtering of abilities and implements a curated set of core abilities (including site settings, current-user info management, and general site awareness).",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Block Bindings for list items",
+    "summary": "Block Bindings expands with new support for binding list-item blocks and inner blocks, letting more of your content connect to dynamic data sources.",
+    "tracking_issue": 77199,
+    "confidence": "high"
+  },
+  {
+    "title": "Enforced iframed editor",
+    "summary": "The current plan is to enforce iframing for block-based themes in this release, then extend it to all themes in a future release.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Extended Unicode support",
+    "summary": "This release is looking to broaden Unicode support so email addresses, usernames, and slugs better reflect WordPress' global audience.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "React 19 Upgrade",
+    "summary": "WordPress is upgrading from React 18 to React 19.",
+    "tracking_issue": 71336,
+    "confidence": "high"
+  },
+  {
+    "title": "Icon API expansion",
+    "summary": "7.1's iteration centers on opening the API up to third parties with new public functions like register_icon() and unregister_icon(), core-icons theme support, SVG sanitization and namespace validation.",
+    "tracking_issue": 75715,
+    "confidence": "high"
+  },
+  {
+    "title": "Classic block deprecation",
+    "summary": "The Classic block is planned for deprecation in 7.1, and will no longer appear in the block inserter.",
+    "tracking_issue": 78067,
+    "confidence": "high"
+  },
+  {
+    "title": "Playlist block",
+    "summary": "Playlist block, with additional waveform audio visualization.",
+    "tracking_issue": 77421,
+    "confidence": "high"
+  },
+  {
+    "title": "Table of Contents block",
+    "summary": "Table of Contents block, automatically generating navigable links to the headings in your content.",
+    "tracking_issue": 42229,
+    "confidence": "high"
+  },
+  {
+    "title": "Tabs block",
+    "summary": "Tabs block, organizes content into tabbed panels.",
+    "tracking_issue": 73230,
+    "confidence": "high"
+  },
+  {
+    "title": "Gallery block lightbox refinements",
+    "summary": "Gallery block lightbox refinements, including swipe indication and opt-in captions on mobile.",
+    "tracking_issue": 56587,
+    "confidence": "high"
+  },
+  {
+    "title": "HTML block new block support",
+    "summary": "New block support for the HTML block, making it possible to have editable blocks inside of a custom HTML block.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Image block decorative toggle",
+    "summary": "\"Mark as decorative\" toggle for the Image block to hide decorative images from screen readers for an improved experience.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Embed shortcode transform",
+    "summary": "An [embed] shortcode transform was added to the Embed block, so converting or pasting [embed] shortcodes now creates a proper Embed block.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Shortcode block transforms",
+    "summary": "Block specific transforms were added to the Shortcode block when text matches a registered shortcode.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Group block background gradients",
+    "summary": "The Group block added support for background gradients through a new background.gradient block support, allowing gradients and background images to work together without conflicts.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "Dialog block",
+    "summary": "Dialog block for transcripts and conversations.",
+    "tracking_issue": 61297,
+    "confidence": "medium"
+  },
+  {
+    "title": "Marquee block",
+    "summary": "Marquee block for scrolling, animated content.",
+    "tracking_issue": 41730,
+    "confidence": "medium"
+  },
+  {
+    "title": "Writing flow improvements",
+    "summary": "A dedicated focus is on chipping away at everyday pain points in the writing experience, from improving drag and drop to ensuring multi-selection works on touch devices.",
+    "tracking_issue": 63255,
+    "confidence": "high"
+  },
+  {
+    "title": "Notes features expansion",
+    "summary": "Notes have a range of planned improvements that include notes on specific content within a block and across multiple blocks, rich text in notes, notifications for replies and follows, emoji reactions, a minified notes experience, and an \"apply suggestions\" feature.",
+    "tracking_issue": 76316,
+    "confidence": "high"
+  },
+  {
+    "title": "Real-time collaboration",
+    "summary": "Real-time collaboration marches ahead with big, open strategy questions around what to land in this release and what storage mechanism to use.",
+    "tracking_issue": 76377,
+    "confidence": "high"
+  },
+  {
+    "title": "Display inherited styles",
+    "summary": "This work explores surfacing inherited styles clearly in the sidebar so you can understand where a block's styles are coming from and edit at the right layer of styling.",
+    "tracking_issue": 77595,
+    "confidence": "high"
+  },
+  {
+    "title": "Interactive states styling",
+    "summary": "Support for pseudo-state styling such as hover, focus, and active has landed for both Global Styles and individual block instances.",
+    "tracking_issue": 38277,
+    "confidence": "high"
+  },
+  {
+    "title": "Pattern editing iterations",
+    "summary": "For this cycle, work will focus on UX improvements based on feedback around this change, bug fixes, and general maintenance.",
+    "tracking_issue": 75717,
+    "confidence": "high"
+  },
+  {
+    "title": "Responsive styling",
+    "summary": "This work lets you define how a block looks at different screen sizes, applying responsive styles directly in the editor without writing custom CSS.",
+    "tracking_issue": 77817,
+    "confidence": "high"
+  },
+  {
+    "title": "Viewport breakpoint customization",
+    "summary": "Theme-configurable breakpoints defined in theme.json are being added to provide more flexible, customizable responsive styling.",
+    "tracking_issue": 75707,
+    "confidence": "high"
+  },
+  {
+    "title": "Client-side media iterations",
+    "summary": "The work spans HEIC image support, Ultra HDR support, GIF-to-video conversion, more resilient uploads that retry on failure and resume after a crash or going offline, video transcoding to web-safe formats.",
+    "tracking_issue": 76756,
+    "confidence": "high"
+  },
+  {
+    "title": "Media editor modal",
+    "summary": "The Media editor modal replaces the existing inline cropping tool in the Block Editor, bringing freeform and aspect-ratio cropping, flip, fine-grained and snap rotation, and metadata editing into one dedicated workflow.",
+    "tracking_issue": 73771,
+    "confidence": "high"
+  },
+  {
+    "title": "Media gallery improvements",
+    "summary": "Galleries are becoming more dynamic and easier to build, with better handling of the legacy gallery shortcode on conversion, dynamic galleries that can sort or pull media attached to a post.",
+    "tracking_issue": 77117,
+    "confidence": "high"
+  },
+  {
+    "title": "Speculative loading update",
+    "summary": "When both object caching and page caching are detected, the default eagerness would move from conservative to moderate, prefetching and prerendering more readily.",
+    "tracking_issue": null,
+    "confidence": "high"
+  },
+  {
+    "title": "View Transitions plugin",
+    "summary": "Work centers around bringing smooth, animated transitions between pages on the front end.",
+    "tracking_issue": null,
+    "confidence": "medium"
+  },
+  {
+    "title": "Enhanced Responsive Images plugin",
+    "summary": "Work computes more accurate sizes values in block themes so browsers download appropriately sized images.",
+    "tracking_issue": null,
+    "confidence": "medium"
+  }
+]

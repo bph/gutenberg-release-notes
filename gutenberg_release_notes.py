@@ -1,340 +1,140 @@
 #!/usr/bin/env python3
 """
-Gutenberg Release Notes Generator
-Fetches multiple Gutenberg releases and generates consolidated user-facing release notes
+Gutenberg release-notes punch-list generator.
+
+Reads the current WP cycle's roadmap + shipped Gutenberg plugin releases,
+cross-references against the SOT Google Doc's "Draft wip" tab to mark which
+PRs are still to cite, and writes the resulting punch-list to the "Backlog"
+tab plus a local markdown mirror.
+
+Usage:
+    python gutenberg_release_notes.py
+    python gutenberg_release_notes.py --refresh-roadmap
+    python gutenberg_release_notes.py --skip-gdoc            # local-only mirror
+    python gutenberg_release_notes.py --force-refresh        # ignore PR cache
 """
 
-import re
-import json
-import requests
-from typing import List, Dict, Optional
-from anthropic import Anthropic
+from __future__ import annotations
 
-# Try to import config, fall back to defaults
-try:
-    from config import (
-        VERSIONS, OUTPUT_FILE, DEVELOPER_KEYWORDS,
-        CLAUDE_MODEL, CLAUDE_MAX_TOKENS, PROMPT_TEMPLATE
-    )
-except ImportError:
-    # Default configuration
-    VERSIONS = ["v22.0.0", "v22.1.0", "v22.2.0", "v22.3.0", "v22.4.0"]
-    OUTPUT_FILE = "./release_notes.md"
-    DEVELOPER_KEYWORDS = [
-        'api', 'hook', 'filter', 'deprecat', 'refactor',
-        'internal', 'unit test', 'e2e test', 'test coverage',
-        'code quality', 'technical debt', 'types', 'typescript'
-    ]
-    CLAUDE_MODEL = "claude-sonnet-4-20250514"
-    CLAUDE_MAX_TOKENS = 4000
-    PROMPT_TEMPLATE = """Create consolidated release notes..."""
+import argparse
+import sys
 
-# Configuration
-GITHUB_API_BASE = "https://api.github.com/repos/WordPress/gutenberg"
-ANTHROPIC_API_KEY = None  # Set via environment variable or parameter
+from config import (
+    SOT_BACKLOG_TAB_TITLE,
+    SOT_DRAFT_TAB_ID,
+    SOT_HANDLED_TAB_TITLE,
+    WP_CYCLE,
+)
+from lib import cluster, gdoc, github_releases, match, punchlist, roadmap, state
 
 
-class GutenbergReleaseProcessor:
-    def __init__(self, anthropic_api_key: Optional[str] = None):
-        """Initialize the processor with optional Anthropic API key"""
-        self.anthropic_api_key = anthropic_api_key
-        if anthropic_api_key:
-            self.client = Anthropic(api_key=anthropic_api_key)
-    
-    def fetch_release(self, version: str) -> Dict:
-        """
-        Fetch a single release from GitHub API
-        
-        Args:
-            version: Release version (e.g., "v22.3.0")
-            
-        Returns:
-            Release data dictionary
-        """
-        url = f"{GITHUB_API_BASE}/releases/tags/{version}"
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json()
-    
-    def parse_enhancements(self, release_body: str) -> List[str]:
-        """
-        Extract enhancement items from release markdown body
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--refresh-roadmap", action="store_true",
+                        help="Re-fetch and re-parse the roadmap post")
+    parser.add_argument("--skip-gdoc", action="store_true",
+                        help="Skip Google Doc read/write; only update local mirror")
+    parser.add_argument("--force-refresh", action="store_true",
+                        help="Re-fetch every release from GitHub (ignore version cache)")
+    args = parser.parse_args(argv)
 
-        Args:
-            release_body: The markdown body of the release
-
-        Returns:
-            List of enhancement items with their subsection context
-        """
-        enhancements = []
-
-        # Normalize line endings to \n only
-        release_body = release_body.replace('\r\n', '\n').replace('\r', '\n')
-
-        # Developer-only subsection headers to filter out
-        developer_subsections = [
-            'data layer', 'code quality', 'build tooling', 'testing',
-            'documentation', 'tools', 'packages', 'tooling'
-        ]
-
-        # Try to find Enhancements section (could be ## or ### level)
-        # Pattern: ### Enhancements ... until next ### or ## section
-        # Use negative lookahead (?!#) to match exactly 2 or 3 hashes, not more
-        pattern = r'###\s*Enhancements\s*(.*?)(?=\n###(?!#)|\n##(?!#)|\Z)'
-        match = re.search(pattern, release_body, re.DOTALL | re.IGNORECASE)
-
-        if not match:
-            # Fallback to ## Enhancements if ### not found
-            pattern = r'##\s*Enhancements\s*(.*?)(?=\n##(?!#)|\Z)'
-            match = re.search(pattern, release_body, re.DOTALL | re.IGNORECASE)
-
-        if not match:
-            return enhancements
-
-        enhancements_section = match.group(1)
-
-        # Parse line by line, tracking current subsection
-        current_subsection = None
-        lines = enhancements_section.split('\n')
-
-        for line in lines:
-            # Check for subsection header (#### SubsectionName)
-            subsection_match = re.match(r'^\s*####\s+(.+)$', line)
-            if subsection_match:
-                current_subsection = subsection_match.group(1).strip()
-                continue
-
-            # Extract bullet points (lines starting with - or *)
-            bullet_match = re.match(r'^[\s]*[-*]\s+(.+)$', line)
-            if bullet_match:
-                item = bullet_match.group(1).strip()
-
-                # Skip items from developer-only subsections
-                if current_subsection:
-                    subsection_lower = current_subsection.lower()
-                    if any(dev_section in subsection_lower for dev_section in developer_subsections):
-                        continue
-
-                enhancements.append(item)
-
-        return enhancements
-    
-    def is_user_facing(self, enhancement: str) -> bool:
-        """
-        Determine if an enhancement is user-facing
-        
-        Args:
-            enhancement: Enhancement text
-            
-        Returns:
-            True if user-facing, False if developer-only
-        """
-        enhancement_lower = enhancement.lower()
-        
-        # Check for developer keywords from config
-        for keyword in DEVELOPER_KEYWORDS:
-            if keyword in enhancement_lower:
-                return False
-        
-        return True
-    
-    def fetch_multiple_releases(self, versions: List) -> List[Dict]:
-        """
-        Fetch multiple releases and extract enhancements
-
-        Args:
-            versions: List of version strings or dicts with file paths
-                     e.g., ["v22.0.0", {"file": "path/to/file.md", "version": "v22.4.0"}]
-
-        Returns:
-            List of dictionaries with version and enhancements
-        """
-        all_data = []
-
-        for version_entry in versions:
-            # Check if it's a local file or API version
-            if isinstance(version_entry, dict) and 'file' in version_entry:
-                # Load from local file
-                version = version_entry['version']
-                file_path = version_entry['file']
-                print(f"Loading {version} from local file: {file_path}...")
-                try:
-                    all_data.append(self._load_from_local_file(file_path, version))
-                    print(f"  Found {len(all_data[-1]['enhancements'])} user-facing enhancements")
-                except Exception as e:
-                    print(f"  Error loading {version} from file: {e}")
-            else:
-                # Fetch from GitHub API
-                version = version_entry
-                print(f"Fetching {version}...")
-                try:
-                    release = self.fetch_release(version)
-                    enhancements = self.parse_enhancements(release['body'])
-
-                    # Filter for user-facing enhancements
-                    user_enhancements = [
-                        e for e in enhancements
-                        if self.is_user_facing(e)
-                    ]
-
-                    all_data.append({
-                        'version': version,
-                        'name': release.get('name', version),
-                        'published_at': release.get('published_at', ''),
-                        'enhancements': user_enhancements
-                    })
-
-                    print(f"  Found {len(user_enhancements)} user-facing enhancements")
-
-                except Exception as e:
-                    print(f"  Error fetching {version}: {e}")
-
-        return all_data
-
-    def _load_from_local_file(self, file_path: str, version: str) -> Dict:
-        """
-        Load changelog from a local markdown file
-
-        Args:
-            file_path: Path to the local changelog file
-            version: Version string (e.g., "v22.4.0")
-
-        Returns:
-            Dictionary with version and enhancements
-        """
-        import os
-
-        # Expand user home directory
-        expanded_path = os.path.expanduser(file_path)
-
-        # Read the file
-        with open(expanded_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # Parse enhancements from the file
-        enhancements = self.parse_enhancements(content)
-
-        # Filter for user-facing enhancements
-        user_enhancements = [
-            e for e in enhancements
-            if self.is_user_facing(e)
-        ]
-
-        return {
-            'version': version,
-            'name': version,
-            'published_at': '',
-            'enhancements': user_enhancements
-        }
-
-    def generate_consolidated_notes(self, releases_data: List[Dict]) -> str:
-        """
-        Use Claude API to generate consolidated release notes
-        
-        Args:
-            releases_data: List of release data with enhancements
-            
-        Returns:
-            Consolidated release notes as a string
-        """
-        if not self.anthropic_api_key:
-            raise ValueError("Anthropic API key required for generating notes")
-        
-        # Prepare the context for Claude
-        context = self._format_context_for_claude(releases_data)
-        
-        # Use prompt from config
-        prompt = PROMPT_TEMPLATE.format(context=context)
-
-        response = self.client.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=CLAUDE_MAX_TOKENS,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        
-        return response.content[0].text
-    
-    def _format_context_for_claude(self, releases_data: List[Dict]) -> str:
-        """Format releases data into a readable context for Claude"""
-        context_parts = []
-        
-        for release in releases_data:
-            version = release['version']
-            enhancements = release['enhancements']
-            
-            context_parts.append(f"### {version}")
-            if enhancements:
-                for enhancement in enhancements:
-                    context_parts.append(f"- {enhancement}")
-            else:
-                context_parts.append("(No user-facing enhancements)")
-            context_parts.append("")  # Blank line
-        
-        return "\n".join(context_parts)
-    
-    def save_notes(self, notes: str, output_file: str):
-        """Save release notes to a file"""
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(notes)
-        print(f"\nRelease notes saved to: {output_file}")
-
-
-def main():
-    """Main execution function"""
-    import os
-    from dotenv import load_dotenv
-
-    # Load environment variables from .env file
-    load_dotenv()
-
-    # Get API key from environment
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        print("Warning: ANTHROPIC_API_KEY not set. Will fetch data but cannot generate notes.")
-        print("Set it with: export ANTHROPIC_API_KEY='your-key-here'")
-    
-    # Initialize processor
-    processor = GutenbergReleaseProcessor(anthropic_api_key=api_key)
-    
-    print("=" * 60)
-    print("Gutenberg Release Notes Generator")
+    print(f"Punch-list run for WP {WP_CYCLE}")
     print("=" * 60)
 
-    # Format version list for display
-    version_list = [
-        v if isinstance(v, str) else v['version']
-        for v in VERSIONS
-    ]
-    print(f"Processing versions: {', '.join(version_list)}\n")
-    
-    # Fetch releases
-    releases_data = processor.fetch_multiple_releases(VERSIONS)
-    
-    # Save raw data for inspection
-    with open('./releases_data.json', 'w') as f:
-        json.dump(releases_data, f, indent=2)
-    print("\nRaw data saved to: releases_data.json")
-    
-    # Generate consolidated notes if API key is available
-    if api_key:
-        print("\nGenerating consolidated release notes with Claude...")
-        try:
-            consolidated_notes = processor.generate_consolidated_notes(releases_data)
-            processor.save_notes(consolidated_notes, OUTPUT_FILE)
-            
-            # Print a preview
-            print("\n" + "=" * 60)
-            print("PREVIEW OF GENERATED NOTES:")
-            print("=" * 60)
-            print(consolidated_notes[:500] + "..." if len(consolidated_notes) > 500 else consolidated_notes)
-            
-        except Exception as e:
-            print(f"Error generating notes: {e}")
+    st = state.load()
+
+    # ---- 1. Roadmap ----
+    if args.refresh_roadmap or not roadmap.ROADMAP_JSON.exists():
+        print("\n[1/6] Refreshing roadmap")
+        roadmap_items = roadmap.refresh()
     else:
-        print("\nSkipping note generation (no API key). Raw data available in releases_data.json")
+        print("\n[1/6] Loading cached roadmap")
+        roadmap_items = roadmap.load()
+        print(f"  {len(roadmap_items)} items")
+
+    # ---- 2. Discover and cache GB releases ----
+    print("\n[2/6] Discovering Gutenberg releases in cycle")
+    releases = github_releases.list_cycle_releases()
+    print(f"  {len(releases)} release(s) in cycle: {', '.join(r['tag_name'] for r in releases) or '(none)'}")
+
+    cached_releases = []
+    for r in releases:
+        print(f"  • {r['tag_name']}")
+        cached_releases.append(github_releases.ensure_cached(r, force_refresh=args.force_refresh))
+
+    # ---- 3. Match PRs to roadmap items ----
+    print("\n[3/6] Matching PRs to roadmap items")
+    shipped_by_version = {
+        cr.version: cr.included_prs() for cr in cached_releases
+    }
+    n_included = sum(len(v) for v in shipped_by_version.values())
+    print(f"  {n_included} included PR(s) across {len(shipped_by_version)} release(s)")
+
+    match_result = match.match(roadmap_items, shipped_by_version)
+    print(f"  {sum(len(it.matched_prs) for it in match_result.items)} matched to roadmap; "
+          f"{len(match_result.leftover_prs)} leftover")
+
+    # ---- 4. Cluster leftovers ----
+    print("\n[4/6] Clustering leftover PRs")
+    clusters = cluster.cluster_leftovers(match_result.leftover_prs)
+    print(f"  {len(clusters)} cluster(s)")
+
+    # ---- 5. Read coverage from Google Doc ----
+    covered: set[int] = set()
+    backlog_tab_id = st.get("backlog_tab_id")
+    preserved_notes = ""
+
+    if not args.skip_gdoc:
+        print("\n[5/6] Reading coverage from Google Doc")
+        draft_prs = gdoc.read_pr_set(tab_id=SOT_DRAFT_TAB_ID)
+        print(f"  Draft wip: {len(draft_prs)} PR number(s) cited")
+
+        handled_tab = gdoc.ensure_tab(SOT_HANDLED_TAB_TITLE)
+        handled_prs = gdoc.read_pr_set(tab_id=handled_tab.tab_id)
+        st["handled_tab_id"] = handled_tab.tab_id
+        print(f"  Handled:   {len(handled_prs)} PR number(s)")
+
+        covered = draft_prs | handled_prs
+
+        backlog_tab = gdoc.ensure_tab(SOT_BACKLOG_TAB_TITLE)
+        backlog_tab_id = backlog_tab.tab_id
+        st["backlog_tab_id"] = backlog_tab_id
+
+        try:
+            existing = gdoc.read_tab_text(tab_id=backlog_tab_id)
+            preserved_notes = gdoc.extract_notes_block(existing)
+        except Exception as e:
+            print(f"  (no prior notes to preserve: {e})")
+    else:
+        print("\n[5/6] Skipping Google Doc (--skip-gdoc); everything will appear as 🔲")
+
+    # ---- 6. Render and write ----
+    print("\n[6/6] Rendering punch-list")
+    versions = sorted({cr.version for cr in cached_releases}, key=lambda v: tuple(int(x) for x in v.lstrip("v").split(".")))
+    prior_prs = set(st.get("last_prs") or [])
+    current_prs = {p.number for it in match_result.items for p in it.matched_prs} | {
+        p.number for c in clusters for p in c.prs
+    }
+    new_prs = current_prs - prior_prs
+
+    body = punchlist.render_markdown(
+        match_result, clusters, covered, new_prs, versions
+    )
+    mirror_path = punchlist.write_local_mirror(body)
+    print(f"  Local mirror: {mirror_path}")
+
+    if not args.skip_gdoc and backlog_tab_id:
+        print(f"  Writing Backlog tab…")
+        gdoc.replace_tab_content(backlog_tab_id, body, preserved_notes=preserved_notes)
+
+    # ---- Persist state ----
+    st["processed_versions"] = versions
+    st["last_prs"] = sorted(current_prs)
+    state.save(st)
+
+    print("\nDone.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

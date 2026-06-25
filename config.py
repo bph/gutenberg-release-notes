@@ -1,66 +1,70 @@
 """
-Configuration file for Gutenberg Release Notes Generator
-Customize this file to change the behavior of the generator
+Configuration for the Gutenberg release-notes punch-list generator.
+
+One WP cycle is "live" at a time. To start the next cycle, update these values
+and commit; the previous cycle's Backlog tab in its Google Doc remains as a
+frozen historical record.
 """
 
-# Versions to process
-# Format: Can be either:
-#   - Version string with 'v' prefix (e.g., "v22.0.0") - fetches from GitHub API
-#   - Dictionary with 'file' key (e.g., {"file": "~/path/to/changelog.md", "version": "v22.4.0"})
-VERSIONS = [
-    
-    "v22.3.0",
-    "v22.4.0",
-    "v22.5.0"
+# ---------------------------------------------------------------------------
+# WordPress release cycle
+# ---------------------------------------------------------------------------
+WP_CYCLE = "7.1"
 
+# First Gutenberg plugin release that belongs to this WP cycle.
+WP_CYCLE_START_VERSION = "v22.7.0"
+
+# GB version aligned with WP cycle's Beta 1. Set when known.
+# - None / unset: pre-Beta-1 mode (include non-backport PRs, exclude backports)
+# - Set: post-Beta-1 mode for releases >= this version (include backports, exclude non-backports)
+WP_CYCLE_BETA_1_VERSION = None
+
+# Last GB version that belongs to this cycle. Set when WP GA ships; until then,
+# new GB releases continue to be processed.
+WP_CYCLE_END_VERSION = None
+
+# ---------------------------------------------------------------------------
+# Source of Truth Google Doc
+# ---------------------------------------------------------------------------
+SOT_DOC_ID = "12KnsxlgMkNSzXN_otRHELBwYmnD-G5U4gZ-XpQciYmc"
+SOT_DRAFT_TAB_ID = "t.ap1297to0djs"  # "Draft wip" — read-only, ✅ source
+SOT_HANDLED_TAB_TITLE = "Handled"     # user-edited, also counts as ✅
+SOT_BACKLOG_TAB_TITLE = "Backlog"     # script-managed, rewritten each run
+
+# ---------------------------------------------------------------------------
+# Roadmap source
+# ---------------------------------------------------------------------------
+ROADMAP_URL = "https://make.wordpress.org/core/2026/06/19/roadmap-to-7-1/"
+
+# ---------------------------------------------------------------------------
+# GitHub
+# ---------------------------------------------------------------------------
+GITHUB_REPO = "WordPress/gutenberg"
+BACKPORT_LABEL = "Backported to WP Core"
+
+# ---------------------------------------------------------------------------
+# Enhancement filtering (carried over from prior version)
+# ---------------------------------------------------------------------------
+DEVELOPER_SUBSECTIONS = [
+    "data layer", "code quality", "build tooling", "testing",
+    "documentation", "tools", "packages", "tooling",
 ]
-#   {"file": "~/GBMain/gutenberg/gb225.md", "version": "v22.5.0"}
-# "v22.0.0",
-#    "v22.1.0",
-#   "v22.2.0",
-# Output file path
-OUTPUT_FILE = "./release_notes_wp_126.md"
 
-# Developer-only keywords (case-insensitive)
-# Enhancements containing these words will be filtered out
 DEVELOPER_KEYWORDS = [
-    'api',
-    'hook', 
-    'filter',
-    'deprecat',
-    'refactor',
-    'internal',
-    'unit test',
-    'e2e test',
-    'test coverage',
-    'code quality',
-    'technical debt',
-    'types',
-    'typescript'
+    "api", "hook", "filter", "deprecat", "refactor",
+    "internal", "unit test", "e2e test", "test coverage",
+    "code quality", "technical debt", "types", "typescript",
 ]
 
-# Claude API configuration
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# ---------------------------------------------------------------------------
+# Claude API
+# ---------------------------------------------------------------------------
+CLAUDE_MODEL = "claude-sonnet-4-5"
 CLAUDE_MAX_TOKENS = 16000
 
-# Prompt template for generating release notes
-PROMPT_TEMPLATE = """You are writing release notes for WordPress Gutenberg plugin updates.
-
-Here are the Enhancement sections from multiple Gutenberg releases:
-
-{context}
-
-Create a single, consolidated release notes document that:
-1. Groups related improvements across versions (e.g., "List View improvements continued across 22.1-22.3")
-2. Shows feature evolution and refinements
-3. Highlights major themes
-4. Uses clear, non-technical language suitable for WordPress users and editors
-5. Avoids repetition - if similar features appear in multiple versions, combine them
-6. Organizes by feature area rather than by version
-
-For each feature, include:
-- Feature name with GitHub PR link(s) in markdown format (e.g., [#72305](https://github.com/WordPress/gutenberg/pull/72305))
-- Brief explanation of what it is and why it matters for users
-- Practical benefits and use cases
-
-Write in a friendly, clear tone that helps users understand the value of each improvement."""
+# ---------------------------------------------------------------------------
+# Paths (relative to repo root)
+# ---------------------------------------------------------------------------
+DATA_DIR = "data"
+PUNCHLIST_DIR = "punchlist"
+USER_CONFIG_DIR = "~/.config/gutenberg-release-notes"  # OAuth credentials live here
