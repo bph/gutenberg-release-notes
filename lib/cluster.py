@@ -103,7 +103,8 @@ def cluster_leftovers(leftover_prs: list[dict]) -> list[Cluster]:
     )
 
     prompt = f"""Group these shipped Gutenberg PRs into 5–15 feature clusters
-for a WordPress release-cycle changelog.
+for a WordPress release-cycle changelog aimed at WordPress users and content
+editors (not core developers).
 
 PRIOR run's clusters (use as anchors — keep titles stable, place new PRs into
 existing clusters when they fit; create new clusters only when a PR doesn't fit;
@@ -115,12 +116,24 @@ PRs to cluster (one per line, format `#number (version): title`):
 
 Rules:
 - Every PR number above MUST appear in exactly one cluster's `pr_numbers` array.
-- Cluster title: 3-7 words; summary: one sentence.
 - Reuse prior cluster titles verbatim when applicable.
+- Cluster `title`: 3-7 words, recognizable to users.
+- Cluster `summary`: a 2-4 sentence paragraph that:
+    1. Explains WHAT the cluster of PRs adds or improves, in plain language users
+       would recognize. Avoid developer jargon — say "list view" not "List View
+       store actions", "block toolbar" not "BlockControls slot."
+    2. Explains WHY it matters — what becomes easier, faster, more reliable, or
+       newly possible for someone editing a site.
+  If the PRs share a clear theme, name it. If they're a grab-bag of polish in one
+  area, say that honestly.
 
 Return ONLY a JSON array, nothing else:
 [
-  {{"title": "...", "summary": "...", "pr_numbers": [12345, 12346]}},
+  {{
+    "title": "Tabs Block polish",
+    "summary": "Continued refinements to the Tabs block following its stabilization in 7.0. This batch adds vertical orientation as a layout option, lets you set distinct colors per tab, and tightens up keyboard navigation so screen-reader and keyboard-only users can move between tabs cleanly. For editors, it means the Tabs block is more flexible visually and more accessible by default.",
+    "pr_numbers": [76055, 76087, 76101]
+  }},
   ...
 ]"""
 

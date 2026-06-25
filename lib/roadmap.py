@@ -84,17 +84,32 @@ def parse_with_claude(text: str) -> list[RoadmapItem]:
     load_dotenv()
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-    prompt = f"""You are parsing a WordPress core roadmap blog post.
+    prompt = f"""You are parsing a WordPress core roadmap blog post for the
+audience of WordPress users and content editors (not core developers).
 
 Extract every distinct feature or work-item the roadmap mentions. For each, return:
-- title: short feature name (3-7 words)
-- summary: one sentence summary, ideally from the post text
-- tracking_issue: GitHub issue number (integer, NO leading #) if the item links to a tracking issue in WordPress/gutenberg. Look for URLs like https://github.com/WordPress/gutenberg/issues/12345. Use null if none is mentioned.
-- confidence: "high" if the item is clearly a discrete feature with explicit title or link; "medium" if you had to interpret somewhat; "low" if you're guessing
+- title: short feature name (3-7 words), as users would recognize it
+- summary: a 2-4 sentence paragraph that:
+    1. Explains in plain language WHAT the feature is and how it shows up in the UI
+       (avoid jargon like "block supports", "data layer" — translate to user-visible terms)
+    2. Explains WHY it matters for users — what problem it solves, what new thing it
+       enables, or how it improves the editing/site-building experience
+  Pull details from the post where available; otherwise infer from the title and
+  context. Keep the tone friendly and concrete.
+- tracking_issue: GitHub issue number (integer, NO leading #) if the item links to
+  a tracking issue in WordPress/gutenberg. Look for URLs like
+  https://github.com/WordPress/gutenberg/issues/12345. Use null if none.
+- confidence: "high" if the item is clearly a discrete feature with explicit title
+  or link; "medium" if you had to interpret somewhat; "low" if you're guessing
 
 Return ONLY a JSON array, no prose. Example:
 [
-  {{"title": "Tabs Block polish", "summary": "Stabilize Tabs block with keyboard nav and color support.", "tracking_issue": 62345, "confidence": "high"}},
+  {{
+    "title": "Tabs Block stabilization",
+    "summary": "The Tabs block, which lets you split content into separately-clickable tabbed sections, graduates from experimental status to a stable, fully-supported core block. This cycle adds polish around keyboard navigation (arrow keys to move between tabs), color and typography controls per tab, and improved accessibility for screen readers. For editors, it means you can now confidently use tabs in published content without worrying about future breakage, and visitors get a more navigable, accessible experience.",
+    "tracking_issue": 62345,
+    "confidence": "high"
+  }},
   ...
 ]
 

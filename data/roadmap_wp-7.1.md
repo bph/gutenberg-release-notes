@@ -2,134 +2,128 @@
 
 _Source: https://make.wordpress.org/core/2026/06/19/roadmap-to-7-1/_
 
-## AI Client generation streaming
-Generation streaming introduced in the PHP AI Client as an initial effort to unlock full usage in a future release.
+## AI generation streaming
+Generation streaming allows AI responses to appear word-by-word in real-time as they're generated, rather than all at once after a delay. This lands first in the PHP AI Client and makes AI feel more responsive and interactive, giving you immediate feedback instead of waiting for a complete response. For editors using AI assistance to draft or refine content, this means a faster, more natural workflow that feels like collaborating with another person.
 
-## AI Client embeddings support
-Embeddings represent content as vectors to enable meaning-based search across a site.
+## AI embeddings support
+Embeddings convert your content into numerical vectors that capture meaning, enabling powerful semantic search across your entire site. Instead of matching exact keywords, visitors can search by concept—asking "how to improve engagement" would find relevant posts even if they use different words. For site owners with large content libraries, this makes finding related articles much easier and more intuitive.
 
-## Connectors authentication expansion — tracking #78647
-Connectors gain more ways to authenticate beyond API keys, starting with username/application password support.
+## Connectors authentication improvements — tracking #78647
+The Connectors framework, which manages connections to external services like AI providers, is gaining support for username and application password authentication beyond simple API keys. New declarative connection forms will let you configure URLs, select default models from dropdowns, and manage credentials more flexibly. This makes it easier for site owners to securely connect WordPress to third-party services without needing custom code.
 
-## Guidelines feature — tracking #75171
-A new Guidelines feature lets you define writing and content guidelines that tie into AI tooling, with the ability to import/export guidelines between sites.
+## Guidelines for editorial rules — tracking #75171
+Guidelines is a new feature that lets you define writing and content rules—your brand voice, style preferences, and editorial standards—directly in WordPress. These guidelines can be imported and exported between sites and are designed to guide both human editors and AI tools, ensuring consistency when collaborating. As more content work happens inside WordPress, Guidelines help you maintain your unique voice and standards across all contributors.
 
-## Command palette organization improvements
-The command palette now groups results into clear sections for recent, suggested, and matching commands.
+## Organized command palette
+The command palette (the quick-access menu you open with keyboard shortcuts) now groups results into recent, suggested, and matching sections, and remembers your recently-used commands across sessions. The visual design has also been refreshed to make scanning results easier. This helps you navigate WordPress faster by surfacing the tools you use most often right at the top.
 
-## Admin color scheme in Site Editor
-The Site Editor sidebar and overall shell now follow the set WordPress admin color scheme instead of always using a fixed dark background.
+## Admin color schemes in Site Editor
+The Site Editor's sidebar and interface now respect your chosen WordPress admin color scheme instead of always showing a dark background. This brings visual consistency across the post editor, Site Editor, and admin dashboard. If you've personalized WordPress with a color scheme you prefer, that choice now carries through everywhere you work.
 
-## DataViews and DataForms iterations — tracking #76045
-Work is underway to migrate DataViews onto the new Design System primitives and consolidate Quick Edit with the editor inspector.
+## DataViews and DataForms improvements — tracking #76045
+DataViews (the modern list interface for posts, pages, and templates) is moving to the new Design System for a more consistent look, and Quick Edit is being unified with the editor inspector so editing post details feels identical no matter where you do it. A new server-side REST endpoint also lets plugin developers add their own custom views and forms. For editors, this means a smoother, more predictable experience managing content and settings.
 
 ## Dedicated Identity section
-A dedicated Design → Identity screen brings the essentials of your site's identity into one place, with an inline media editor for your logo and favicon.
+A new Design → Identity screen consolidates your site's logo, favicon, title, and tagline into one easy-to-find location, with inline editing so you can crop and adjust images right there. This eliminates hunting through Settings or digging into templates just to update foundational branding. For new site builders especially, it makes setting up your site's identity quick and straightforward.
 
-## Design System ThemeProvider graduation — tracking #76941
-A highlight of this cycle is graduating ThemeProvider from experimental to a stable, public API, alongside finalizing the public token names.
+## Design System and ThemeProvider stabilization — tracking #76941
+The shared component library (@wordpress/ui) continues evolving, with ThemeProvider graduating from experimental to stable and public token names being finalized (background, foreground, stroke). New customization tokens for corner radius and element sizing are added, and editor menus (transforms, style variations, block options) adopt the improved components. For users, this means a more polished, consistent interface throughout WordPress with smoother interactions.
 
 ## On This Day dashboard widget
-The dashboard is getting a new "On This Day" widget that resurfaces past content, a popular feature across many different platforms.
+The dashboard gains a new "On This Day" widget that surfaces past content you published on the same date in previous years, similar to memory features on social platforms. It's designed to motivate you by reminding you of what you've accomplished and encouraging you to write more. For content creators, it's a pleasant nudge to reflect on your archive and stay engaged with your site.
 
 ## Persistent admin bar (omnibar) — tracking #79036
-The admin bar is getting some nice polish ahead of being easily accessible in the Site Editor and Block Editor.
+The admin bar, which normally sits at the top of your site's front end, is now accessible inside the Site Editor and Block Editor. The design has been refreshed: the "Howdy" greeting is removed, your site icon replaces the home icon, the profile avatar becomes circular, and old Dashicons are replaced with modern SVG icons. This keeps familiar navigation with you wherever you're working, reducing the need to jump back to the dashboard.
 
-## Revisions improvements — tracking #79120
-Planned improvements include a spark line view in the scrubbing toolbar to better visualize the history of changes, persistent URLs to allow sharing a link to a particular revision, and more.
+## Visual revisions improvements — tracking #79120
+Building on the visual revisions introduced in 7.0, this release adds a sparkline visualization in the scrubbing toolbar to show the history of changes at a glance, and persistent URLs so you can share a link to a specific revision with collaborators. These refinements make it easier to understand what changed when and navigate between versions, improving collaboration and content review workflows.
 
-## Abilities API iteration
-This cycle advances querying and filtering of abilities and implements a curated set of core abilities (including site settings, current-user info management, and general site awareness).
+## Abilities API expansion
+The Abilities API provides a structured way for developers and AI tools to query what your WordPress site can do—what settings exist, what the current user can manage, and general site capabilities. This cycle advances querying and filtering and implements a curated set of core abilities. For users, this mostly works behind the scenes but enables smarter AI assistance and better integration with external tools that need to understand your site's capabilities.
 
-## Block Bindings for list items — tracking #77199
-Block Bindings expands with new support for binding list-item blocks and inner blocks, letting more of your content connect to dynamic data sources.
+## Block Bindings for list-items and inner blocks — tracking #77199
+Block Bindings, which connect blocks to dynamic data sources, now supports binding list-item blocks and inner blocks within containers. This means more of your content can be dynamically populated—for example, a list of team members pulled from custom fields or an external database. For site builders creating data-driven sites, this expands what you can accomplish without custom code.
 
 ## Enforced iframed editor
-The current plan is to enforce iframing for block-based themes in this release, then extend it to all themes in a future release.
+The post editor runs inside an iframe, which isolates your content from admin styles and makes viewport units and media queries work correctly against the editing canvas rather than the browser window. In 7.1, iframing becomes enforced for block-based themes (with classic themes following in a future release). For editors, this ensures the canvas behaves predictably and blocks render accurately, though plugin developers need to update older blocks to Block API version 3.
 
 ## Extended Unicode support
-This release is looking to broaden Unicode support so email addresses, usernames, and slugs better reflect WordPress' global audience.
+WordPress is broadening support for Unicode in email addresses, usernames, and slugs so they can include non-ASCII characters, better reflecting WordPress's global audience. Core functions like is_email(), sanitize_email(), and antispambot() are being updated to handle international characters. For users whose names or emails use non-Latin scripts, this removes frustrating barriers and makes WordPress more inclusive and accessible worldwide.
 
-## React 19 Upgrade — tracking #71336
-WordPress is upgrading from React 18 to React 19.
+## React 19 upgrade — tracking #71336
+WordPress is upgrading from React 18 to React 19, bringing new APIs, updated TypeScript types, and changed behaviors. This will first land in the Gutenberg plugin as an opt-in experiment for testing before merging to Core. For users, this is largely invisible but ensures WordPress stays modern and performant. Plugin and theme developers should test early to ensure compatibility.
 
-## Icon API expansion — tracking #75715
-7.1's iteration centers on opening the API up to third parties with new public functions like register_icon() and unregister_icon(), core-icons theme support, SVG sanitization and namespace validation.
+## Icon API expansion and icon refresh — tracking #75715
+The SVG Icon API, introduced in 7.0, is opening to third parties with functions like register_icon() and unregister_icon(), collection support (similar to the Font Library), and a reusable icon picker modal. Core blocks like Navigation, Breadcrumbs, and Details will let you choose icons, and the Icon block gains flip and rotate controls. The core icon set is also being visually refreshed with stroke-based designs. For editors and designers, this means far more flexibility to customize icons across your site without plugins.
 
 ## Classic block deprecation — tracking #78067
-The Classic block is planned for deprecation in 7.1, and will no longer appear in the block inserter.
+As a first step toward making the Classic block and TinyMCE editor opt-in, the Classic block will no longer appear in the block inserter by default in 7.1. Existing Classic blocks will continue to work, and migration and conversion paths are being improved. For most users, this means a lighter, faster editor; sites that still need the Classic block can opt back in.
 
 ## Playlist block — tracking #77421
-Playlist block, with additional waveform audio visualization.
+The new Playlist block lets you create audio playlists with waveform visualization, making it easy to showcase multiple tracks or podcast episodes in a single interactive player. Visitors can browse and play through your audio content without leaving the page. For podcasters, musicians, and audio content creators, this provides a rich, modern listening experience built right into WordPress.
 
 ## Table of Contents block — tracking #42229
-Table of Contents block, automatically generating navigable links to the headings in your content.
+The new Table of Contents block automatically generates a clickable list of links to all the headings in your post or page, making long-form content easier to navigate. As you add or edit headings, the table updates automatically. For readers, this provides a quick overview and jump-to navigation; for writers, it encourages better content structure and improves accessibility.
 
 ## Tabs block — tracking #73230
-Tabs block, organizes content into tabbed panels.
+The new Tabs block organizes content into separate tabbed panels that visitors click to reveal, letting you present information compactly without overwhelming the page. This is useful for FAQs, product features, or any content where you want to show options side-by-side. For editors, it's a familiar, flexible layout pattern now available natively in WordPress without needing a plugin.
 
 ## Gallery block lightbox refinements — tracking #56587
-Gallery block lightbox refinements, including swipe indication and opt-in captions on mobile.
+The Gallery block's lightbox feature gains swipe indicators and opt-in captions on mobile, improving the experience for visitors browsing image galleries on phones and tablets. Swipe indicators make it clear you can navigate by touch, and captions provide context without cluttering the gallery view. For photographers and visual storytellers, this makes mobile galleries more polished and user-friendly.
 
-## HTML block new block support
-New block support for the HTML block, making it possible to have editable blocks inside of a custom HTML block.
+## HTML block editable blocks support
+The HTML block now supports embedding editable blocks inside custom HTML markup, making it possible to mix hand-coded HTML with block-based content. This is especially useful when working with AI-generated sites, as AI models often produce custom HTML. For advanced users and developers, this bridges the gap between code and blocks, offering more flexibility without sacrificing editability.
 
-## Image block decorative toggle
-"Mark as decorative" toggle for the Image block to hide decorative images from screen readers for an improved experience.
+## Mark as decorative toggle
+The Image block gains a "Mark as decorative" toggle that hides decorative images from screen readers, improving accessibility. Decorative images (like design flourishes) don't convey essential information, so hiding them reduces noise for users relying on assistive technology. For content creators focused on accessibility, this provides an easy, built-in way to follow best practices.
 
-## Embed shortcode transform
-An [embed] shortcode transform was added to the Embed block, so converting or pasting [embed] shortcodes now creates a proper Embed block.
+## Embed block shortcode transform
+Pasting or converting an [embed] shortcode now automatically creates a proper Embed block instead of leaving raw shortcode text behind. This makes migrating older content smoother and ensures embeds from YouTube, Twitter, and other services display correctly. For users importing content or working with legacy posts, this removes a common cleanup step.
 
-## Shortcode block transforms
-Block specific transforms were added to the Shortcode block when text matches a registered shortcode.
+## Shortcode block specific transforms
+When you paste text matching a registered shortcode into a Shortcode block, WordPress now offers block-specific transforms to convert it into the equivalent block automatically. This makes it much easier to modernize old shortcode-based content into blocks. For editors working with older sites, this speeds up the transition to block-based editing.
 
 ## Group block background gradients
-The Group block added support for background gradients through a new background.gradient block support, allowing gradients and background images to work together without conflicts.
+The Group block now supports background gradients through a new background.gradient block support, allowing gradients and background images to coexist without conflicts. You can apply rich, layered backgrounds to sections of your page directly in the editor. For designers, this opens up more creative possibilities without needing custom CSS, and the feature will expand to more blocks in future releases.
 
-## Dialog block — tracking #61297
-Dialog block for transcripts and conversations.
+## Writing flow and drag-and-drop improvements — tracking #63255
+A dedicated focus on everyday writing pain points brings improvements to drag-and-drop block reordering and multi-selection on touch devices. These refinements make arranging content smoother and more intuitive, especially on tablets. For writers and editors, this reduces friction in the day-to-day task of organizing posts and pages, making the editor feel more responsive and natural.
 
-## Marquee block — tracking #41730
-Marquee block for scrolling, animated content.
-
-## Writing flow improvements — tracking #63255
-A dedicated focus is on chipping away at everyday pain points in the writing experience, from improving drag and drop to ensuring multi-selection works on touch devices.
-
-## Notes features expansion — tracking #76316
-Notes have a range of planned improvements that include notes on specific content within a block and across multiple blocks, rich text in notes, notifications for replies and follows, emoji reactions, a minified notes experience, and an "apply suggestions" feature.
+## Notes features: suggestions and reactions — tracking #76316
+Notes (inline comments and feedback within the editor) gain major improvements: you can leave notes on specific content within or across multiple blocks, use rich text formatting, receive notifications for replies and follows, add emoji reactions, and apply suggestions directly. A minified notes view keeps feedback unobtrusive. For teams collaborating on content, this makes asynchronous feedback richer, more interactive, and easier to act on without leaving WordPress.
 
 ## Real-time collaboration — tracking #76377
-Real-time collaboration marches ahead with big, open strategy questions around what to land in this release and what storage mechanism to use.
+Real-time collaboration aims to let multiple editors (human and AI) work on the same post simultaneously without post locks, seeing each other's changes as they happen. Strategic decisions around what to ship (full feature vs. underlying architecture) and storage mechanisms are still being finalized, with dedicated outreach and testing underway. For collaborative teams, this promises a Google Docs–style editing experience directly in WordPress, though the exact rollout and availability are still being determined.
 
 ## Display inherited styles — tracking #77595
-This work explores surfacing inherited styles clearly in the sidebar so you can understand where a block's styles are coming from and edit at the right layer of styling.
+When styling a block, it's often unclear whether styles come from the theme, a parent block, or global settings. This feature surfaces inherited styles clearly in the sidebar, showing you where each style originates and letting you edit at the right layer—global or local. For designers and site builders, this transparency makes styling more predictable and helps you avoid accidentally overriding the wrong settings.
 
-## Interactive states styling — tracking #38277
-Support for pseudo-state styling such as hover, focus, and active has landed for both Global Styles and individual block instances.
+## Interactive states styling (hover, focus) — tracking #38277
+You can now style interactive pseudo-states like hover, focus, and active for blocks—both globally and per-instance—without writing any CSS. For example, change a button's color on hover directly in the editor. This makes interactive design accessible to non-coders and eliminates the need to add custom CSS snippets for common interactions. Future work will expand this to custom states like styling the current menu item.
 
-## Pattern editing iterations — tracking #75717
-For this cycle, work will focus on UX improvements based on feedback around this change, bug fixes, and general maintenance.
+## Pattern editing experience improvements — tracking #75717
+WordPress 7.0 shifted pattern editing to focus on content changes rather than exposing every tool, treating patterns more like single blocks. In 7.1, work focuses on UX refinements based on feedback, bug fixes, and general maintenance. For users inserting and customizing patterns, this means a more polished, predictable experience with fewer rough edges.
 
-## Responsive styling — tracking #77817
-This work lets you define how a block looks at different screen sizes, applying responsive styles directly in the editor without writing custom CSS.
+## Responsive styling for blocks — tracking #77817
+Responsive styling lets you define how a block looks at different screen sizes—for example, use a larger font on desktop and a smaller one on mobile—directly in the editor without custom CSS. This works for both global styles (affecting all instances of a block) and individual block instances. For designers and site builders, this makes responsive design a built-in, first-class part of the editing experience, ensuring your site looks great on all devices.
 
 ## Viewport breakpoint customization — tracking #75707
-Theme-configurable breakpoints defined in theme.json are being added to provide more flexible, customizable responsive styling.
+Building on the ability to hide or show blocks by viewport size, themes can now define custom breakpoints in theme.json, giving you more flexible, fine-grained control over responsive behavior. Instead of being locked to default breakpoints, you can tailor responsive styling to match your design system. For theme developers and designers, this provides the precision needed for modern, device-agnostic layouts.
 
-## Client-side media iterations — tracking #76756
-The work spans HEIC image support, Ultra HDR support, GIF-to-video conversion, more resilient uploads that retry on failure and resume after a crash or going offline, video transcoding to web-safe formats.
+## Client-side media processing improvements — tracking #76756
+Client-side media processing (handling images and videos in your browser before upload) gains HEIC and Ultra HDR image support, GIF-to-video conversion, resilient uploads that retry on failure and resume after crashes or going offline, video transcoding to web-safe formats, optimization of previously uploaded media, and local poster generation for videos. For editors uploading media, this means faster, more reliable uploads, broader format support, and better-optimized files without manual intervention.
 
-## Media editor modal — tracking #73771
-The Media editor modal replaces the existing inline cropping tool in the Block Editor, bringing freeform and aspect-ratio cropping, flip, fine-grained and snap rotation, and metadata editing into one dedicated workflow.
+## Free-form media editor modal — tracking #73771
+The new media editor modal replaces the inline cropping tool, accessed via the familiar Crop button, and brings together free-form and aspect-ratio cropping, flip, fine-grained rotation with snap guides, and metadata editing in one unified workflow. For editors preparing images, this provides a more powerful, streamlined editing experience without leaving WordPress or needing external tools.
 
 ## Media gallery improvements — tracking #77117
-Galleries are becoming more dynamic and easier to build, with better handling of the legacy gallery shortcode on conversion, dynamic galleries that can sort or pull media attached to a post.
+Galleries become more dynamic and easier to build with better handling of the legacy [gallery] shortcode on conversion, dynamic galleries that can automatically pull or sort media attached to the current post, and a quicker path in the inserter's media tab to attached images with thumbnails shown directly. For content creators, this makes assembling image galleries faster and more flexible, especially when working with post attachments.
 
-## Speculative loading update
-When both object caching and page caching are detected, the default eagerness would move from conservative to moderate, prefetching and prerendering more readily.
+## Speculative loading performance update
+Speculative loading (prefetching and prerendering pages before visitors click) will shift from conservative to moderate eagerness on sites with both object caching and page caching detected, making navigation feel faster. The browser intelligently loads likely-next pages in the background, so clicking a link shows content almost instantly. For visitors, this means a snappier, app-like browsing experience on well-optimized sites.
 
 ## View Transitions plugin
-Work centers around bringing smooth, animated transitions between pages on the front end.
+The View Transitions feature plugin brings smooth, animated transitions between pages on the front end, similar to single-page app experiences. It's under active development as a plugin you can install today, with the goal of eventual Core inclusion. For site owners wanting a more polished, modern front-end experience, this adds visual continuity as visitors navigate your site.
 
 ## Enhanced Responsive Images plugin
-Work computes more accurate sizes values in block themes so browsers download appropriately sized images.
+The Enhanced Responsive Images plugin computes more accurate sizes attributes for images in block themes, ensuring browsers download appropriately sized images and improving performance. It's available as a plugin today with active development toward Core. For site owners, this means faster page loads and less wasted bandwidth, especially on mobile devices, with no manual image optimization needed.

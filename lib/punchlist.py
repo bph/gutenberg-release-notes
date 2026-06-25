@@ -103,7 +103,7 @@ def render_markdown(
             tracking = f" — tracking #{item.tracking_issue}" if item.tracking_issue else ""
             lines.append(f"### {status} {item.title}{tracking}")
             if item.summary:
-                lines.append(f"_{item.summary}_")
+                lines.append(item.summary)
             lines.append("")
             for pr in item.matched_prs:
                 lines.append(_pr_line(pr, covered, new_prs))
@@ -120,7 +120,7 @@ def render_markdown(
         for c in clusters:
             lines.append(f"### {c.title}")
             if c.summary:
-                lines.append(f"_{c.summary}_")
+                lines.append(c.summary)
             lines.append("")
             for p in c.prs:
                 lines.append(_pr_line(
