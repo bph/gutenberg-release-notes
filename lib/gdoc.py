@@ -29,7 +29,10 @@ PR_URL_RE = re.compile(r"https?://github\.com/[^/]+/[^/]+/pull/(\d+)")
 # Markdown inline patterns
 MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 MD_BOLD_RE = re.compile(r"\*\*([^*\n]+)\*\*")
-MD_ITALIC_RE = re.compile(r"_([^_\n]+)_")
+# Italic open/close must be at word boundaries — otherwise an underscore inside
+# a URL (e.g. `…/d/12KnsxlgMkNSzXN_otRHEL…/edit`) would close italic early and
+# break any link parsing inside the italic span.
+MD_ITALIC_RE = re.compile(r"(?<![\w])_(.+?)_(?![\w])")
 
 
 def _utf16_len(s: str) -> int:
