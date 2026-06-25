@@ -27,8 +27,10 @@ WP_CYCLE_END_VERSION = None
 # Source of Truth Google Doc
 # ---------------------------------------------------------------------------
 SOT_DOC_ID = "12KnsxlgMkNSzXN_otRHELBwYmnD-G5U4gZ-XpQciYmc"
-SOT_DRAFT_TAB_ID = "t.ap1297to0djs"  # "Draft wip" — read-only, ✅ source
-SOT_HANDLED_TAB_TITLE = "Handled"     # user-edited, also counts as ✅
+# All tabs are looked up by exact title (case + punctuation matters).
+# Rename here if you rename a tab in the doc.
+SOT_DRAFT_TAB_TITLE = "Draft [WIP]"   # read-only, ✅ source
+SOT_HANDLED_TAB_TITLE = "Handles"     # user-edited, also counts as ✅
 SOT_BACKLOG_TAB_TITLE = "Backlog"     # script-managed, rewritten each run
 
 # ---------------------------------------------------------------------------

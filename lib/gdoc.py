@@ -113,7 +113,9 @@ def _get_document(*, include_tabs: bool = True) -> dict:
 
 
 def list_tabs() -> list[TabInfo]:
-    doc = _get_document(include_tabs=False)
+    # `includeTabsContent=true` is required to get the `tabs` field at all,
+    # not just to populate tab body content.
+    doc = _get_document(include_tabs=True)
     return _flatten_tabs(doc.get("tabs", []))
 
 
@@ -127,26 +129,18 @@ def find_tab(*, tab_id: str | None = None, title: str | None = None) -> TabInfo 
 
 
 def ensure_tab(title: str) -> TabInfo:
-    """Find a tab by title, or create one. Returns the (possibly new) tab info."""
+    """Find a tab by title. Raises if missing — the Docs API does not (yet)
+    support programmatic tab creation, so the user has to create it manually
+    in Google Docs."""
     existing = find_tab(title=title)
     if existing:
         return existing
-
-    requests = [
-        {
-            "createDocumentTab": {
-                "tabProperties": {"title": title}
-            }
-        }
-    ]
-    _service().documents().batchUpdate(
-        documentId=SOT_DOC_ID, body={"requests": requests}
-    ).execute()
-
-    found = find_tab(title=title)
-    if not found:
-        raise RuntimeError(f"Created tab '{title}' but couldn't find it on re-read.")
-    return found
+    raise RuntimeError(
+        f"Tab '{title}' not found in the SOT doc.\n"
+        f"  → Open the doc in Google Docs and create a tab named exactly '{title}', "
+        f"then re-run.\n"
+        f"  (The Google Docs API does not yet support programmatic tab creation.)"
+    )
 
 
 # ---------------------------------------------------------------------------

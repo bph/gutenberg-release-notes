@@ -73,53 +73,54 @@ def cluster_leftovers(leftover_prs: list[dict]) -> list[Cluster]:
     """
     Cluster PRs into feature groups, reusing prior cluster shape when possible.
     Returns the new full set of clusters, also persists to `clusters_wp-<cycle>.json`.
+
+    Claude only emits PR numbers per cluster (small payload, hard to truncate).
+    We reconstruct the full PR objects locally from `leftover_prs`.
     """
     if not leftover_prs:
         _save([])
         return []
 
     prior = _load_prior()
+    by_number = {pr["number"]: pr for pr in leftover_prs}
 
     load_dotenv()
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
+    # Compact PR brief for the prompt
     pr_brief = [
-        {
-            "number": pr["number"],
-            "title": pr["title"],
-            "version": pr["version"],
-            "url": pr["url"],
-        }
+        f"#{pr['number']} ({pr['version']}): {pr['title']}"
         for pr in leftover_prs
     ]
 
-    prompt = f"""Group these shipped Gutenberg PRs into 5–12 feature clusters
+    prior_brief = (
+        [
+            {"title": c["title"], "pr_numbers": [p["number"] for p in c.get("prs", [])]}
+            for c in prior
+        ]
+        if prior
+        else []
+    )
+
+    prompt = f"""Group these shipped Gutenberg PRs into 5–15 feature clusters
 for a WordPress release-cycle changelog.
 
-PRIOR run's clusters (use as anchors — keep names stable, place new PRs into
-existing clusters when they fit; create new clusters only when a PR doesn't fit):
-{json.dumps(prior, indent=2) if prior else "[]"}
+PRIOR run's clusters (use as anchors — keep titles stable, place new PRs into
+existing clusters when they fit; create new clusters only when a PR doesn't fit;
+drop a prior cluster only if none of its PRs reappear in this run):
+{json.dumps(prior_brief, indent=2)}
 
-NEW set of PRs to cluster (this run):
-{json.dumps(pr_brief, indent=2)}
+PRs to cluster (one per line, format `#number (version): title`):
+{chr(10).join(pr_brief)}
 
 Rules:
-- Reuse the prior cluster TITLES verbatim when a new PR fits them.
-- Create new clusters only for PRs that don't fit any existing cluster.
-- Drop prior clusters whose PRs are all gone (none reappear this run).
-- Each cluster: short title (3-7 words), one-sentence summary, and the list
-  of PRs assigned to it. Every PR in the input MUST appear in exactly one
-  cluster output — none get dropped.
+- Every PR number above MUST appear in exactly one cluster's `pr_numbers` array.
+- Cluster title: 3-7 words; summary: one sentence.
+- Reuse prior cluster titles verbatim when applicable.
 
-Return ONLY a JSON array (no prose):
+Return ONLY a JSON array, nothing else:
 [
-  {{
-    "title": "Tabs Block polish",
-    "summary": "Continued Tabs block refinements after the 7.0 stabilization.",
-    "prs": [
-      {{"number": 75890, "title": "...", "url": "...", "version": "v22.7.0"}}
-    ]
-  }},
+  {{"title": "...", "summary": "...", "pr_numbers": [12345, 12346]}},
   ...
 ]"""
 
@@ -130,7 +131,42 @@ Return ONLY a JSON array (no prose):
     )
     raw = resp.content[0].text.strip()
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL)
-    data = json.loads(raw)
-    clusters = [_to_cluster(c) for c in data]
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        debug_path = CLUSTERS_PATH.parent / f"clusters_wp-{WP_CYCLE}.raw.txt"
+        debug_path.write_text(raw)
+        print(f"  ⚠️  Cluster JSON parse failed: {e}; raw saved to {debug_path}")
+        raise
+
+    clusters: list[Cluster] = []
+    seen: set[int] = set()
+    for c in data:
+        prs: list[ClusterPR] = []
+        for n in c.get("pr_numbers", []):
+            pr = by_number.get(int(n))
+            if not pr or int(n) in seen:
+                continue
+            seen.add(int(n))
+            prs.append(ClusterPR(
+                number=pr["number"], title=pr["title"],
+                url=pr["url"], version=pr["version"],
+            ))
+        if prs:
+            clusters.append(Cluster(title=c["title"], summary=c.get("summary", ""), prs=prs))
+
+    # Catch any PRs the LLM forgot to place
+    missing = [pr for n, pr in by_number.items() if n not in seen]
+    if missing:
+        clusters.append(Cluster(
+            title="Unclustered",
+            summary="PRs the clusterer didn't assign to a feature group.",
+            prs=[ClusterPR(
+                number=pr["number"], title=pr["title"],
+                url=pr["url"], version=pr["version"],
+            ) for pr in missing],
+        ))
+
     _save(clusters)
     return clusters

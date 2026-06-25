@@ -18,10 +18,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 
 from config import (
     SOT_BACKLOG_TAB_TITLE,
-    SOT_DRAFT_TAB_ID,
+    SOT_DRAFT_TAB_TITLE,
     SOT_HANDLED_TAB_TITLE,
     WP_CYCLE,
 )
@@ -43,51 +44,20 @@ def main(argv: list[str] | None = None) -> int:
 
     st = state.load()
 
-    # ---- 1. Roadmap ----
-    if args.refresh_roadmap or not roadmap.ROADMAP_JSON.exists():
-        print("\n[1/6] Refreshing roadmap")
-        roadmap_items = roadmap.refresh()
-    else:
-        print("\n[1/6] Loading cached roadmap")
-        roadmap_items = roadmap.load()
-        print(f"  {len(roadmap_items)} items")
-
-    # ---- 2. Discover and cache GB releases ----
-    print("\n[2/6] Discovering Gutenberg releases in cycle")
-    releases = github_releases.list_cycle_releases()
-    print(f"  {len(releases)} release(s) in cycle: {', '.join(r['tag_name'] for r in releases) or '(none)'}")
-
-    cached_releases = []
-    for r in releases:
-        print(f"  • {r['tag_name']}")
-        cached_releases.append(github_releases.ensure_cached(r, force_refresh=args.force_refresh))
-
-    # ---- 3. Match PRs to roadmap items ----
-    print("\n[3/6] Matching PRs to roadmap items")
-    shipped_by_version = {
-        cr.version: cr.included_prs() for cr in cached_releases
-    }
-    n_included = sum(len(v) for v in shipped_by_version.values())
-    print(f"  {n_included} included PR(s) across {len(shipped_by_version)} release(s)")
-
-    match_result = match.match(roadmap_items, shipped_by_version)
-    print(f"  {sum(len(it.matched_prs) for it in match_result.items)} matched to roadmap; "
-          f"{len(match_result.leftover_prs)} leftover")
-
-    # ---- 4. Cluster leftovers ----
-    print("\n[4/6] Clustering leftover PRs")
-    clusters = cluster.cluster_leftovers(match_result.leftover_prs)
-    print(f"  {len(clusters)} cluster(s)")
-
-    # ---- 5. Read coverage from Google Doc ----
+    # ---- 1. Google Doc auth + read coverage (eager, so browser opens FIRST) ----
     covered: set[int] = set()
-    backlog_tab_id = st.get("backlog_tab_id")
+    backlog_tab_id: str | None = st.get("backlog_tab_id")
     preserved_notes = ""
 
     if not args.skip_gdoc:
-        print("\n[5/6] Reading coverage from Google Doc")
-        draft_prs = gdoc.read_pr_set(tab_id=SOT_DRAFT_TAB_ID)
-        print(f"  Draft wip: {len(draft_prs)} PR number(s) cited")
+        print("\n[1/7] Authenticating to Google Docs + reading coverage")
+        print("  (first run will open a browser for consent)")
+        print(f"  Required tabs in the doc: '{SOT_DRAFT_TAB_TITLE}', "
+              f"'{SOT_HANDLED_TAB_TITLE}', '{SOT_BACKLOG_TAB_TITLE}' "
+              f"— create these manually if missing (case-sensitive).")
+        draft_tab = gdoc.ensure_tab(SOT_DRAFT_TAB_TITLE)
+        draft_prs = gdoc.read_pr_set(tab_id=draft_tab.tab_id)
+        print(f"  {SOT_DRAFT_TAB_TITLE}: {len(draft_prs)} PR number(s) cited")
 
         handled_tab = gdoc.ensure_tab(SOT_HANDLED_TAB_TITLE)
         handled_prs = gdoc.read_pr_set(tab_id=handled_tab.tab_id)
@@ -103,13 +73,56 @@ def main(argv: list[str] | None = None) -> int:
         try:
             existing = gdoc.read_tab_text(tab_id=backlog_tab_id)
             preserved_notes = gdoc.extract_notes_block(existing)
+            if preserved_notes:
+                print(f"  📝 Preserved {len(preserved_notes.splitlines())} lines of notes")
         except Exception as e:
             print(f"  (no prior notes to preserve: {e})")
     else:
-        print("\n[5/6] Skipping Google Doc (--skip-gdoc); everything will appear as 🔲")
+        print("\n[1/7] Skipping Google Doc (--skip-gdoc); everything will appear as 🔲")
 
-    # ---- 6. Render and write ----
-    print("\n[6/6] Rendering punch-list")
+    # ---- 2. Roadmap ----
+    if args.refresh_roadmap or not roadmap.ROADMAP_JSON.exists():
+        print("\n[2/7] Refreshing roadmap (calling Claude to parse)…")
+        t = time.time()
+        roadmap_items = roadmap.refresh()
+        print(f"  parsed {len(roadmap_items)} items in {time.time() - t:.1f}s")
+    else:
+        print("\n[2/7] Loading cached roadmap")
+        roadmap_items = roadmap.load()
+        print(f"  {len(roadmap_items)} items")
+
+    # ---- 3. Discover and cache GB releases ----
+    print("\n[3/7] Discovering Gutenberg releases in cycle")
+    releases = github_releases.list_cycle_releases()
+    print(f"  {len(releases)} release(s) in cycle: {', '.join(r['tag_name'] for r in releases) or '(none)'}")
+
+    cached_releases = []
+    for r in releases:
+        print(f"  • {r['tag_name']}", flush=True)
+        cached_releases.append(github_releases.ensure_cached(r, force_refresh=args.force_refresh))
+
+    # ---- 4. Match PRs to roadmap items ----
+    print("\n[4/7] Matching PRs to roadmap items")
+    shipped_by_version = {
+        cr.version: cr.included_prs() for cr in cached_releases
+    }
+    n_included = sum(len(v) for v in shipped_by_version.values())
+    print(f"  {n_included} included PR(s) across {len(shipped_by_version)} release(s)")
+    print("  resolving tracking issues + fuzzy-matching…", flush=True)
+
+    t = time.time()
+    match_result = match.match(roadmap_items, shipped_by_version)
+    print(f"  {sum(len(it.matched_prs) for it in match_result.items)} matched to roadmap; "
+          f"{len(match_result.leftover_prs)} leftover ({time.time() - t:.1f}s)")
+
+    # ---- 5. Cluster leftovers ----
+    print(f"\n[5/7] Clustering {len(match_result.leftover_prs)} leftover PRs (Claude, ~30-90s)…", flush=True)
+    t = time.time()
+    clusters = cluster.cluster_leftovers(match_result.leftover_prs)
+    print(f"  {len(clusters)} cluster(s) in {time.time() - t:.1f}s")
+
+    # ---- 6. Render ----
+    print("\n[6/7] Rendering punch-list")
     versions = sorted({cr.version for cr in cached_releases}, key=lambda v: tuple(int(x) for x in v.lstrip("v").split(".")))
     prior_prs = set(st.get("last_prs") or [])
     current_prs = {p.number for it in match_result.items for p in it.matched_prs} | {
@@ -124,8 +137,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Local mirror: {mirror_path}")
 
     if not args.skip_gdoc and backlog_tab_id:
-        print(f"  Writing Backlog tab…")
+        print("\n[7/7] Writing Backlog tab…", flush=True)
         gdoc.replace_tab_content(backlog_tab_id, body, preserved_notes=preserved_notes)
+        print("  done")
+    else:
+        print("\n[7/7] Skipped Google Doc write")
 
     # ---- Persist state ----
     st["processed_versions"] = versions

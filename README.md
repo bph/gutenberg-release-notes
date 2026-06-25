@@ -51,6 +51,8 @@ Per-PR:
 - **Handled** — user-edited list of PR numbers you've dealt with by means *other than* a direct citation. Use it for: features covered in prose without explicit cites, intentional skips, or genuine false positives. One-line notes alongside each number are encouraged.
 - **Backlog** — script-managed. Rewritten each run, except for the `📝 Notes` block at the top guarded by `<!-- your notes below survive rewrites -->`.
 
+> **Important**: Google Docs API does not yet support programmatic tab creation. Before the first run, **create both `Handled` and `Backlog` tabs manually** in your SOT Google Doc (right-click any tab → "New tab"). The script will fail with a clear error if either is missing.
+
 ## One-time setup
 
 ### 1. Python environment
