@@ -26,8 +26,10 @@ SCOPES = ["https://www.googleapis.com/auth/documents"]
 PR_HASH_RE = re.compile(r"#(\d+)")
 PR_URL_RE = re.compile(r"https?://github\.com/[^/]+/[^/]+/pull/(\d+)")
 
-# Markdown inline link: [text](url)
+# Markdown inline patterns
 MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+MD_BOLD_RE = re.compile(r"\*\*([^*\n]+)\*\*")
+MD_ITALIC_RE = re.compile(r"_([^_\n]+)_")
 
 
 def _utf16_len(s: str) -> int:
@@ -35,29 +37,131 @@ def _utf16_len(s: str) -> int:
     return len(s.encode("utf-16-le")) // 2
 
 
-def _markdown_links_to_plain(md: str) -> tuple[str, list[tuple[int, int, str]]]:
-    """Strip `[text](url)` → `text`. Returns (plain_text, [(start, end, url), ...])
-    where start/end are UTF-16 offsets within plain_text."""
+def _process_inline(text: str, cursor_utf16: int) -> tuple[str, list[dict]]:
+    """Strip inline markdown (links, bold, italic). Return (plain_text, style_ops).
+
+    style_ops items: {"start", "end", "link"|"bold"|"italic", ...}
+    """
     out_parts: list[str] = []
-    links: list[tuple[int, int, str]] = []
-    cursor = 0  # UTF-16 cursor
-    pos = 0
-    for m in MD_LINK_RE.finditer(md):
-        before = md[pos:m.start()]
-        out_parts.append(before)
-        cursor += _utf16_len(before)
+    ops: list[dict] = []
+    i = 0
+    pos = cursor_utf16
+    while i < len(text):
+        m = MD_LINK_RE.match(text, i)
+        if m:
+            label = m.group(1)
+            url = m.group(2)
+            start = pos
+            end = pos + _utf16_len(label)
+            out_parts.append(label)
+            ops.append({"start": start, "end": end, "link": url})
+            pos = end
+            i = m.end()
+            continue
 
-        text = m.group(1)
-        url = m.group(2)
-        start = cursor
-        end = cursor + _utf16_len(text)
-        links.append((start, end, url))
+        m = MD_BOLD_RE.match(text, i)
+        if m:
+            inner = m.group(1)
+            start = pos
+            end = pos + _utf16_len(inner)
+            out_parts.append(inner)
+            ops.append({"start": start, "end": end, "bold": True})
+            pos = end
+            i = m.end()
+            continue
 
-        out_parts.append(text)
-        cursor = end
-        pos = m.end()
-    out_parts.append(md[pos:])
-    return "".join(out_parts), links
+        m = MD_ITALIC_RE.match(text, i)
+        if m:
+            inner = m.group(1)
+            start = pos
+            end = pos + _utf16_len(inner)
+            out_parts.append(inner)
+            ops.append({"start": start, "end": end, "italic": True})
+            pos = end
+            i = m.end()
+            continue
+
+        ch = text[i]
+        out_parts.append(ch)
+        pos += _utf16_len(ch)
+        i += 1
+    return "".join(out_parts), ops
+
+
+def markdown_to_docs_ops(md: str) -> tuple[str, list[dict]]:
+    """Convert markdown to (plain_text, ops).
+
+    ops items:
+        {"kind": "paragraph_style", "start": int, "end": int, "style": "HEADING_1"|...}
+        {"kind": "bullets", "start": int, "end": int}
+        {"kind": "text_style", "start": int, "end": int, "link"?: str, "bold"?: bool, "italic"?: bool}
+    Indices are UTF-16 offsets within the returned plain_text.
+    """
+    plain_parts: list[str] = []
+    ops: list[dict] = []
+    cursor = 0  # UTF-16 position
+
+    bullet_block_start: int | None = None
+
+    def close_bullet_block(end: int) -> None:
+        nonlocal bullet_block_start
+        if bullet_block_start is not None:
+            ops.append({"kind": "bullets", "start": bullet_block_start, "end": end})
+            bullet_block_start = None
+
+    lines = md.split("\n")
+    for raw_line in lines:
+        line = raw_line.rstrip("\r")
+        paragraph_start = cursor
+        style: str | None = None
+        is_bullet = False
+        body = line
+
+        if line.startswith("# "):
+            style = "HEADING_1"
+            body = line[2:]
+        elif line.startswith("## "):
+            style = "HEADING_2"
+            body = line[3:]
+        elif line.startswith("### "):
+            style = "HEADING_3"
+            body = line[4:]
+        elif line.startswith("- ") or line.startswith("* "):
+            is_bullet = True
+            body = line[2:]
+        elif line.strip() == "---":
+            # Render horizontal rules as a blank line.
+            body = ""
+
+        if not is_bullet:
+            close_bullet_block(cursor)
+
+        plain_line, inline_ops = _process_inline(body, cursor)
+        plain_parts.append(plain_line)
+        cursor += _utf16_len(plain_line)
+
+        for op in inline_ops:
+            ops.append({"kind": "text_style", **op})
+
+        # Append newline to terminate the paragraph
+        plain_parts.append("\n")
+        cursor += 1
+
+        # Paragraph-level styles cover the line INCLUDING the trailing \n,
+        # so the style is applied to that paragraph only and the next one
+        # starts fresh (NORMAL by default).
+        if style:
+            ops.append({"kind": "paragraph_style", "start": paragraph_start, "end": cursor, "style": style})
+        elif is_bullet:
+            if bullet_block_start is None:
+                bullet_block_start = paragraph_start
+        else:
+            # Normal paragraph; close any open bullet block now (was already closed above
+            # if non-bullet, but a defensive close is harmless).
+            pass
+
+    close_bullet_block(cursor)
+    return "".join(plain_parts), ops
 
 
 def _config_dir() -> Path:
@@ -269,33 +373,121 @@ def _read_tab_doc(tab_id: str) -> tuple[dict, dict]:
     return doc, tab
 
 
-def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str = "") -> None:
-    """Rewrite the entire tab content. Inserts a Notes section + the body.
+def _doc_requests_for_body(
+    tab_id: str, body_markdown: str, *, base_index: int, offset_utf16: int
+) -> tuple[str, list[dict]]:
+    """Build the requests to render `body_markdown` as styled Docs content.
 
-    Converts `[text](url)` markdown links into real Docs hyperlinks via
-    updateTextStyle requests so PR references are clickable.
+    `base_index + offset_utf16` is the index where the body's plain text will
+    begin in the doc (i.e. after the notes section). Returns (plain_body_text,
+    requests_after_insert).
+    """
+    plain, ops = markdown_to_docs_ops(body_markdown)
+
+    def doc_index(utf16_pos: int) -> int:
+        return base_index + offset_utf16 + utf16_pos
+
+    requests: list[dict] = []
+
+    # Paragraph styles
+    for op in ops:
+        if op["kind"] != "paragraph_style":
+            continue
+        requests.append({
+            "updateParagraphStyle": {
+                "range": {
+                    "tabId": tab_id,
+                    "startIndex": doc_index(op["start"]),
+                    "endIndex": doc_index(op["end"]),
+                },
+                "paragraphStyle": {"namedStyleType": op["style"]},
+                "fields": "namedStyleType",
+            }
+        })
+
+    # Bullets — one createParagraphBullets per contiguous block
+    for op in ops:
+        if op["kind"] != "bullets":
+            continue
+        requests.append({
+            "createParagraphBullets": {
+                "range": {
+                    "tabId": tab_id,
+                    "startIndex": doc_index(op["start"]),
+                    "endIndex": doc_index(op["end"]),
+                },
+                "bulletPreset": "BULLET_DISC_CIRCLE_SQUARE",
+            }
+        })
+
+    # Inline text styles
+    for op in ops:
+        if op["kind"] != "text_style":
+            continue
+        text_style: dict = {}
+        fields: list[str] = []
+        if "link" in op:
+            text_style["link"] = {"url": op["link"]}
+            text_style["foregroundColor"] = {
+                "color": {"rgbColor": {"red": 0.067, "green": 0.333, "blue": 0.8}}
+            }
+            text_style["underline"] = True
+            fields += ["link", "foregroundColor", "underline"]
+        if op.get("bold"):
+            text_style["bold"] = True
+            fields.append("bold")
+        if op.get("italic"):
+            text_style["italic"] = True
+            fields.append("italic")
+        if not fields:
+            continue
+        requests.append({
+            "updateTextStyle": {
+                "range": {
+                    "tabId": tab_id,
+                    "startIndex": doc_index(op["start"]),
+                    "endIndex": doc_index(op["end"]),
+                },
+                "textStyle": text_style,
+                "fields": ",".join(fields),
+            }
+        })
+
+    return plain, requests
+
+
+def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str = "") -> None:
+    """Rewrite the entire tab content. Inserts a Notes section + a styled body.
+
+    Markdown structure is converted to real Docs styling:
+        # ## ###       → HEADING_1/2/3 paragraph styles
+        - item         → bulleted list
+        _italic_       → italic
+        **bold**       → bold
+        [text](url)    → hyperlink
     """
     doc, tab = _read_tab_doc(tab_id)
     body = tab.get("documentTab", {}).get("body", {})
     content = body.get("content", [])
 
-    # Compute the deletion range. Content always ends with a trailing newline
-    # whose end index is the tab's end. Docs requires us to leave the final
-    # newline alone — delete from index 1 up to (end - 1).
     if not content:
         return
     end_index = content[-1].get("endIndex", 1)
     delete_end = max(1, end_index - 1)
 
-    # Build the notes section as-is (plain text, no link conversion).
     notes_section = (
         f"{NOTES_HEADER}\n"
         f"{NOTES_MARKER}\n"
         f"{preserved_notes}\n\n"
     )
-    # Strip markdown links from the body, track UTF-16 ranges + URLs.
-    body_plain, body_links = _markdown_links_to_plain(body_markdown)
-    full_text = notes_section + body_plain
+
+    notes_offset = _utf16_len(notes_section)
+    plain_body, body_style_requests = _doc_requests_for_body(
+        tab_id, body_markdown,
+        base_index=1, offset_utf16=notes_offset,
+    )
+
+    full_text = notes_section + plain_body
     if not full_text.endswith("\n"):
         full_text += "\n"
 
@@ -311,6 +503,7 @@ def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str
             }
         })
 
+    # 1) Insert the full text
     requests.append({
         "insertText": {
             "location": {"tabId": tab_id, "index": 1},
@@ -318,26 +511,25 @@ def replace_tab_content(tab_id: str, body_markdown: str, *, preserved_notes: str
         }
     })
 
-    # Apply hyperlink styling to each link range.
-    notes_offset = _utf16_len(notes_section)
-    for start, end, url in body_links:
+    # 2) Reset the body region's paragraphs to NORMAL_TEXT (so any inherited
+    #    styles from before deletion are cleared), then apply our paragraph
+    #    styles on top.
+    plain_body_len = _utf16_len(plain_body)
+    if plain_body_len > 0:
         requests.append({
-            "updateTextStyle": {
+            "updateParagraphStyle": {
                 "range": {
                     "tabId": tab_id,
-                    "startIndex": 1 + notes_offset + start,
-                    "endIndex": 1 + notes_offset + end,
+                    "startIndex": 1 + notes_offset,
+                    "endIndex": 1 + notes_offset + plain_body_len,
                 },
-                "textStyle": {
-                    "link": {"url": url},
-                    "foregroundColor": {
-                        "color": {"rgbColor": {"red": 0.067, "green": 0.333, "blue": 0.8}}
-                    },
-                    "underline": True,
-                },
-                "fields": "link,foregroundColor,underline",
+                "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                "fields": "namedStyleType",
             }
         })
+
+    # 3) Apply markdown-derived styles
+    requests.extend(body_style_requests)
 
     _service().documents().batchUpdate(
         documentId=SOT_DOC_ID, body={"requests": requests}
