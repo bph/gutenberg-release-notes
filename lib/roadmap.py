@@ -110,6 +110,9 @@ Extract every distinct feature or work-item the roadmap mentions. For each, retu
 - confidence: "high" if the item is clearly a discrete feature with explicit title
   or link; "medium" if you had to interpret somewhat; "low" if you're guessing
 
+IMPORTANT: In summary text, use single quotes 'like this' for quoted phrases.
+Do NOT use double-quote characters " inside string values — they break the JSON.
+
 Return ONLY a JSON array, no prose. Example:
 [
   {{
@@ -135,7 +138,14 @@ The post text:
     raw = resp.content[0].text.strip()
     # Trim possible code fences
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL)
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        dump = Path(DATA_DIR) / f"roadmap_wp-{WP_CYCLE}.raw.txt"
+        dump.parent.mkdir(parents=True, exist_ok=True)
+        dump.write_text(raw)
+        print(f"  ⚠️  Claude output failed to parse; raw dump: {dump}")
+        raise
     items: list[RoadmapItem] = []
     for it in data:
         items.append(
