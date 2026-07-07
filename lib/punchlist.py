@@ -52,13 +52,16 @@ def _item_status(item: MatchedRoadmapItem, covered: set[int]) -> str:
 def _wp_develop_line(ref: WpDevelopRef, covered: set[int], new_prs: set[int]) -> str:
     mark = "✅" if ref.number in covered else "🔲"
     new = " 🆕" if ref.number in new_prs else ""
+    pr_link = f"[#{ref.number}]({ref.url})"
     if ref.trac_tickets:
-        # e.g. [#10123/Trac#64066](url) — join multiple tickets with commas
-        trac = ",".join(f"Trac#{t}" for t in ref.trac_tickets)
-        label = f"[#{ref.number}/{trac}]({ref.url})"
+        trac_links = "/".join(
+            f"[Trac#{t}](https://core.trac.wordpress.org/ticket/{t})"
+            for t in ref.trac_tickets
+        )
+        label = f"{pr_link}/{trac_links}"
     else:
-        label = f"[#{ref.number}]({ref.url})"
-    return f"- {mark} {ref.title} {label}"
+        label = pr_link
+    return f"- {mark} {ref.title} {label}{new}"
 
 
 def _pr_line(pr: MatchedPR | dict, covered: set[int], new_prs: set[int]) -> str:
