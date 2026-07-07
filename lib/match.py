@@ -18,8 +18,9 @@ from dotenv import load_dotenv
 from anthropic import Anthropic
 
 from config import CLAUDE_MAX_TOKENS, CLAUDE_MODEL
-from lib import tracking
+from lib import tracking, wp_develop
 from lib.roadmap import RoadmapItem
+from lib.wp_develop import WpDevelopRef
 
 
 @dataclass
@@ -48,6 +49,7 @@ class MatchedRoadmapItem:
     tracking_url: str = ""
     matched_prs: list[MatchedPR] = field(default_factory=list)
     sub_groups: list[SubGroup] = field(default_factory=list)
+    wp_develop_refs: list[WpDevelopRef] = field(default_factory=list)
 
 
 LARGE_ITEM_THRESHOLD = 15  # split into sub-areas when matched_prs exceeds this
@@ -110,6 +112,8 @@ def match(
                         )
                     )
                     assigned.add(n)
+        if ri.wp_develop_prs:
+            m.wp_develop_refs = wp_develop.fetch_many(ri.wp_develop_prs)
         items.append(m)
 
     # Tier 2: Claude fuzzy matching against ALL roadmap items (not just those
@@ -286,6 +290,7 @@ def to_jsonable(result: MatchResult) -> dict:
             {
                 **asdict(m),
                 "matched_prs": [asdict(p) for p in m.matched_prs],
+                "wp_develop_refs": [asdict(r) for r in m.wp_develop_refs],
             }
             for m in result.items
         ],

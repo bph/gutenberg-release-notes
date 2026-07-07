@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +34,9 @@ class RoadmapItem:
     summary: str
     tracking_issue: int | None
     confidence: str  # "high" | "medium" | "low"
+    # WordPress/wordpress-develop PR numbers referenced from the roadmap post.
+    # Optional / defaults to empty for backward-compat with older cached JSON.
+    wp_develop_prs: list[int] = field(default_factory=list)
 
 
 def fetch_html(url: str = ROADMAP_URL) -> str:
@@ -99,6 +102,11 @@ Extract every distinct feature or work-item the roadmap mentions. For each, retu
 - tracking_issue: GitHub issue number (integer, NO leading #) if the item links to
   a tracking issue in WordPress/gutenberg. Look for URLs like
   https://github.com/WordPress/gutenberg/issues/12345. Use null if none.
+- wp_develop_prs: array of PR numbers (integers, NO leading #) referenced from
+  WordPress/wordpress-develop. Look for URLs like
+  https://github.com/WordPress/wordpress-develop/pull/12345. Empty array if none.
+  Include EVERY wp-develop PR mentioned in the roadmap post, even if the item
+  primarily lives in the Gutenberg plugin.
 - confidence: "high" if the item is clearly a discrete feature with explicit title
   or link; "medium" if you had to interpret somewhat; "low" if you're guessing
 
@@ -108,6 +116,7 @@ Return ONLY a JSON array, no prose. Example:
     "title": "Tabs Block stabilization",
     "summary": "The Tabs block, which lets you split content into separately-clickable tabbed sections, graduates from experimental status to a stable, fully-supported core block. This cycle adds polish around keyboard navigation (arrow keys to move between tabs), color and typography controls per tab, and improved accessibility for screen readers. For editors, it means you can now confidently use tabs in published content without worrying about future breakage, and visitors get a more navigable, accessible experience.",
     "tracking_issue": 62345,
+    "wp_develop_prs": [10123, 11501],
     "confidence": "high"
   }},
   ...
@@ -135,6 +144,7 @@ The post text:
                 summary=it.get("summary", ""),
                 tracking_issue=it.get("tracking_issue"),
                 confidence=it.get("confidence", "medium"),
+                wp_develop_prs=[int(n) for n in (it.get("wp_develop_prs") or [])],
             )
         )
     return items

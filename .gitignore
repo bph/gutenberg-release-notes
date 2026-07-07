@@ -9,6 +9,7 @@ token.json
 # Generated caches and outputs — re-derived from API + roadmap on each run
 data/versions/
 data/tracking/
+data/wp_develop/
 data/state_wp-*.json
 data/clusters_wp-*.json
 data/clusters_wp-*.raw.txt

@@ -31,20 +31,34 @@ from config import (
 )
 from lib.cluster import Cluster
 from lib.match import MatchedPR, MatchedRoadmapItem, MatchResult
+from lib.wp_develop import WpDevelopRef
 
 
 PUNCHLIST_PATH = Path(PUNCHLIST_DIR) / f"wp-{WP_CYCLE}.md"
 
 
 def _item_status(item: MatchedRoadmapItem, covered: set[int]) -> str:
-    if not item.matched_prs:
+    numbers = [p.number for p in item.matched_prs] + [r.number for r in item.wp_develop_refs]
+    if not numbers:
         return "⏳"
-    covered_count = sum(1 for p in item.matched_prs if p.number in covered)
+    covered_count = sum(1 for n in numbers if n in covered)
     if covered_count == 0:
         return "🚧"
-    if covered_count == len(item.matched_prs):
+    if covered_count == len(numbers):
         return "✅"
     return "🟡"
+
+
+def _wp_develop_line(ref: WpDevelopRef, covered: set[int], new_prs: set[int]) -> str:
+    mark = "✅" if ref.number in covered else "🔲"
+    new = " 🆕" if ref.number in new_prs else ""
+    if ref.trac_tickets:
+        # e.g. [#10123/Trac#64066](url) — join multiple tickets with commas
+        trac = ",".join(f"Trac#{t}" for t in ref.trac_tickets)
+        label = f"[#{ref.number}/{trac}]({ref.url})"
+    else:
+        label = f"[#{ref.number}]({ref.url})"
+    return f"- {mark} {ref.title} {label}"
 
 
 def _pr_line(pr: MatchedPR | dict, covered: set[int], new_prs: set[int]) -> str:
@@ -123,6 +137,13 @@ def render_markdown(
             else:
                 for pr in item.matched_prs:
                     lines.append(_pr_line(pr, covered, new_prs))
+                lines.append("")
+
+            if item.wp_develop_refs:
+                lines.append("**Related WordPress core PRs**")
+                lines.append("")
+                for ref in item.wp_develop_refs:
+                    lines.append(_wp_develop_line(ref, covered, new_prs))
                 lines.append("")
 
     # ---- Additional features (clusters from leftovers) ----
