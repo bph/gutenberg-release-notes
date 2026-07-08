@@ -23,6 +23,11 @@ WP_CYCLE_BETA_1_VERSION = None
 # new GB releases continue to be processed.
 WP_CYCLE_END_VERSION = None
 
+# Earliest merge/creation date for wp-develop PRs considered for this cycle
+# during automatic discovery. Roughly matches WP_CYCLE_START_VERSION's
+# release date, with a small buffer.
+WP_CYCLE_SEARCH_START_DATE = "2026-03-01"
+
 # ---------------------------------------------------------------------------
 # Source of Truth Google Doc
 # ---------------------------------------------------------------------------

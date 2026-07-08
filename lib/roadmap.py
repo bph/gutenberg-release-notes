@@ -182,6 +182,15 @@ def refresh() -> list[RoadmapItem]:
     text = _html_to_text(article)
     items = parse_with_claude(text)
 
+    # Enrich items with wp-develop PRs discovered by searching wordpress-develop
+    # for the ones the roadmap post didn't link inline. Deferred import to avoid
+    # a circular dependency at module load time.
+    from lib import wp_develop_discover
+    try:
+        wp_develop_discover.discover(items)
+    except Exception as e:  # noqa: BLE001 — discovery is best-effort
+        print(f"  ⚠️  wp-develop discovery failed: {e}")
+
     ROADMAP_JSON.parent.mkdir(parents=True, exist_ok=True)
     ROADMAP_JSON.write_text(json.dumps([asdict(i) for i in items], indent=2))
     _write_md(items)
