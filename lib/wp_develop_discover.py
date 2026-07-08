@@ -101,9 +101,11 @@ Summary: {item.summary}
 Candidate PRs from WordPress/wordpress-develop:
 {json.dumps(brief, indent=2)}
 
-Return a JSON array of PR numbers that clearly implement, test, or
-directly support this roadmap item. Only include strong matches — a false
-positive is worse than a miss here.
+Return a JSON array of PR numbers that plausibly implement, test, or
+directly support this roadmap item. Include reasonable matches — the user
+will review and prune false positives downstream, so a missed real match
+costs more than an extra plausible one. Exclude candidates that clearly
+belong to an unrelated feature.
 
 Return ONLY a JSON array like [12345, 67890] — or [] if no match."""
     resp = client.messages.create(
