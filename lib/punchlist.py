@@ -28,6 +28,8 @@ from config import (
     ROADMAP_URL,
     SOT_DOC_ID,
     WP_CYCLE,
+    WP_CYCLE_PENDING_MILESTONE,
+    WP_CYCLE_PENDING_VERSION,
 )
 from lib.cluster import Cluster
 from lib.match import MatchedPR, MatchedRoadmapItem, MatchResult
@@ -100,6 +102,11 @@ def render_markdown(
     lines.append(f"_Source of Truth doc: [open]({doc_url})_")
     if versions_covered:
         lines.append(f"_Versions covered: {versions_covered[0]} – {versions_covered[-1]}_")
+    if WP_CYCLE_PENDING_MILESTONE:
+        lines.append(
+            f"_Includes pending milestone '{WP_CYCLE_PENDING_MILESTONE}' "
+            f"({WP_CYCLE_PENDING_VERSION})_"
+        )
     lines.append("_⏳ pending · 🚧 shipped, not in draft · 🟡 partial · ✅ done · 🔲 PR not yet cited · 🆕 new this run · ⚠️ low-confidence match_")
     lines.append("")
 

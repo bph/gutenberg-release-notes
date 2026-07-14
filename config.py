@@ -64,6 +64,35 @@ DEVELOPER_KEYWORDS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Pending-milestone (unreleased) PRs
+# ---------------------------------------------------------------------------
+# Gutenberg milestone whose merged PRs should be treated as a pseudo-release,
+# for including work merged for the next GB version that hasn't shipped yet.
+# Format: exact GitHub milestone name, e.g. "Gutenberg 23.6". Set to None to
+# skip.
+WP_CYCLE_PENDING_MILESTONE = "Gutenberg 23.6"
+# Version tag under which the pending PRs are grouped in the punchlist.
+# Rendered next to each bullet as _v23.6.0-pending_ so it's clear these
+# PRs aren't from a published release yet.
+WP_CYCLE_PENDING_VERSION = "v23.6.0-pending"
+
+# Pending-milestone PR filter — approximates the changelog "Enhancements"
+# section for releases that haven't shipped yet.
+PENDING_TYPE_ALLOW = [
+    "[Type] Enhancement", "[Type] Feature", "[Type] Bug",
+    "[Type] New API", "[Type] Performance",
+]
+PENDING_TYPE_REJECT = [
+    "[Type] Code Quality", "[Type] Testing", "[Type] Automated Testing",
+    "[Type] Build Tooling", "[Type] Documentation",
+    "[Type] Project Management", "[Type] Regression", "[Type] Task",
+]
+PENDING_PACKAGE_REJECT = [
+    "[Package] Data", "[Package] Element", "[Package] Scripts",
+    "[Package] E2E Tests", "[Package] Env", "[Package] Eslint Plugin",
+]
+
+# ---------------------------------------------------------------------------
 # Claude API
 # ---------------------------------------------------------------------------
 CLAUDE_MODEL = "claude-sonnet-4-5"

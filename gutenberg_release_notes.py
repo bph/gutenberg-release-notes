@@ -25,8 +25,19 @@ from config import (
     SOT_DRAFT_TAB_TITLE,
     SOT_HANDLED_TAB_TITLE,
     WP_CYCLE,
+    WP_CYCLE_PENDING_MILESTONE,
+    WP_CYCLE_PENDING_VERSION,
 )
-from lib import cluster, gdoc, github_releases, match, punchlist, roadmap, state
+from lib import (
+    cluster,
+    gdoc,
+    github_releases,
+    match,
+    pending_release,
+    punchlist,
+    roadmap,
+    state,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Re-fetch every release from GitHub (ignore version cache)")
     parser.add_argument("--refresh-clusters", action="store_true",
                         help="Delete the cluster cache to force a fresh clustering pass")
+    parser.add_argument("--refresh-pending", action="store_true",
+                        help="Force re-fetch of the pending-milestone PR cache")
     args = parser.parse_args(argv)
 
     print(f"Punch-list run for WP {WP_CYCLE}")
@@ -103,6 +116,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  • {r['tag_name']}", flush=True)
         cached_releases.append(github_releases.ensure_cached(r, force_refresh=args.force_refresh))
 
+    if WP_CYCLE_PENDING_MILESTONE:
+        try:
+            pending = pending_release.ensure_pending(
+                WP_CYCLE_PENDING_MILESTONE,
+                WP_CYCLE_PENDING_VERSION,
+                force_refresh=args.refresh_pending,
+            )
+            included = len(pending.included_prs())
+            print(f"  • {WP_CYCLE_PENDING_VERSION} ({included} included / {len(pending.prs)} total PRs, pending)")
+            cached_releases.insert(0, pending)
+        except Exception as e:  # noqa: BLE001 — pending fetch is best-effort
+            print(f"  ⚠️  pending milestone fetch failed: {e}")
+
     # ---- 4. Match PRs to roadmap items ----
     print("\n[4/7] Matching PRs to roadmap items")
     shipped_by_version = {
@@ -128,7 +154,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---- 6. Render ----
     print("\n[6/7] Rendering punch-list")
-    versions = sorted({cr.version for cr in cached_releases}, key=lambda v: tuple(int(x) for x in v.lstrip("v").split(".")))
+    def _version_key(v: str) -> tuple[int, ...]:
+        # Strip a possible "-pending" (or other) suffix from the final segment
+        # so v23.6.0-pending still sorts as (23, 6, 0).
+        parts = v.lstrip("v").split(".")
+        parts[-1] = parts[-1].split("-", 1)[0]
+        return tuple(int(p) for p in parts)
+    versions = sorted({cr.version for cr in cached_releases}, key=_version_key)
     prior_prs = set(st.get("last_prs") or [])
     current_prs = {p.number for it in match_result.items for p in it.matched_prs} | {
         p.number for c in clusters for p in c.prs
